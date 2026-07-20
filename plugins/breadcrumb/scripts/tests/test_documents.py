@@ -1,0 +1,73 @@
+from __future__ import annotations
+
+import unittest
+
+from support import copied_fixture
+
+from internal.documents import DocumentProblem, parse_issue_status
+
+
+class IssueBodyTests(unittest.TestCase):
+    def test_requirement_and_design_status(self) -> None:
+        requirement = copied_fixture("requirement_issue.json")
+        design = copied_fixture("design_issue.json")
+        requirement_status = parse_issue_status(requirement["body"], "requirement")
+        design_status = parse_issue_status(design["body"], "design")
+        self.assertEqual(requirement_status.phase, "ready")
+        self.assertIsNone(requirement_status.related_requirement)
+        self.assertEqual(design_status.related_requirement, 12)
+
+    def test_phase_must_match_todo(self) -> None:
+        issue = copied_fixture("requirement_issue.json")
+        issue["body"] = issue["body"].replace("- [x]", "- [ ]")
+        with self.assertRaises(DocumentProblem) as raised:
+            parse_issue_status(issue["body"], "requirement")
+        self.assertEqual(raised.exception.code, "invalid_phase")
+
+    def test_state_block_must_be_final(self) -> None:
+        issue = copied_fixture("requirement_issue.json")
+        with self.assertRaises(DocumentProblem) as raised:
+            parse_issue_status(issue["body"] + "\ntrailing", "requirement")
+        self.assertEqual(raised.exception.code, "invalid_marker_order")
+
+    def test_invalid_todo_syntax_is_rejected(self) -> None:
+        issue = copied_fixture("requirement_issue.json")
+        issue["body"] = issue["body"].replace(
+            "- [x] Confirm the threshold", "An unresolved note"
+        )
+        with self.assertRaises(DocumentProblem) as raised:
+            parse_issue_status(issue["body"], "requirement")
+        self.assertEqual(raised.exception.code, "invalid_todo")
+
+    def test_reserved_lines_and_lowercase_checkbox_are_exact(self) -> None:
+        issue = copied_fixture("requirement_issue.json")
+        cases = (
+            (issue["body"].replace("<!-- breadcrumb:state:start -->", " <!-- breadcrumb:state:start -->"), "missing_marker"),
+            (issue["body"].replace("## Todo", "## Todo "), "missing_heading"),
+            (issue["body"].replace("- [x]", "- [X]"), "invalid_todo"),
+        )
+        for body, code in cases:
+            with self.subTest(code=code), self.assertRaises(DocumentProblem) as raised:
+                parse_issue_status(body, "requirement")
+            self.assertEqual(raised.exception.code, code)
+
+    def test_status_rejects_unknown_and_out_of_order_fields(self) -> None:
+        issue = copied_fixture("requirement_issue.json")
+        unknown = issue["body"].replace(
+            "- Last Breadcrumb Step: open",
+            "- Extra: value\n- Last Breadcrumb Step: open",
+        )
+        out_of_order = issue["body"].replace(
+            "- Schema Version: 1\n- Type: requirement",
+            "- Type: requirement\n- Schema Version: 1",
+        )
+        with self.assertRaises(DocumentProblem) as unknown_error:
+            parse_issue_status(unknown, "requirement")
+        with self.assertRaises(DocumentProblem) as order_error:
+            parse_issue_status(out_of_order, "requirement")
+        self.assertEqual(unknown_error.exception.code, "unknown_field")
+        self.assertEqual(order_error.exception.code, "invalid_field_order")
+
+
+if __name__ == "__main__":
+    unittest.main()

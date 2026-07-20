@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breadcrumb List"
+  short_description: "List compact Breadcrumb workflow progress"
+  default_prompt: "Use $breadcrumb-list to list Breadcrumb workflow progress."

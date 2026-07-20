@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "created_at": "2026-01-03T00:00:00Z",
+    "updated_at": "2026-01-10T00:00:00Z",
+    "body": "A normal human comment."
+  },
+  {
+    "id": 2,
+    "created_at": "2026-01-04T00:00:00Z",
+    "author_association": "OWNER",
+    "body": "<!--\nbreadcrumb:\n  version: 1\n  step: implement\n  issue: 999\n  branch: breadcrumb/999-wrong-issue\n  commit: 0123456789abcdef0123456789abcdef01234567\n  verification: passed\n-->\n\n## Breadcrumb: Implementation"
+  },
+  {
+    "id": 3,
+    "created_at": "2026-01-05T00:00:00Z",
+    "author_association": "MEMBER",
+    "body": "<!--\nbreadcrumb:\n  version: 1\n  step: implement\n  issue: 21\n  branch: breadcrumb/21-login-rate-limit-old\n  commit: 0123456789abcdef0123456789abcdef01234567\n  verification: failed\n-->\n\n## Breadcrumb: Implementation"
+  },
+  {
+    "id": 4,
+    "created_at": "2026-01-05T00:00:00Z",
+    "author_association": "COLLABORATOR",
+    "body": "<!--\nbreadcrumb:\n  version: 1\n  step: implement\n  issue: 21\n  branch: breadcrumb/21-login-rate-limit\n  commit: abcdef0123456789abcdef0123456789abcdef01\n  verification: passed\n-->\n\n## Breadcrumb: Implementation"
+  }
+]

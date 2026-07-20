@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breadcrumb Init"
+  short_description: "Initialize a repository for Breadcrumb workflow"
+  default_prompt: "Use $breadcrumb-init to initialize this repository for Breadcrumb."

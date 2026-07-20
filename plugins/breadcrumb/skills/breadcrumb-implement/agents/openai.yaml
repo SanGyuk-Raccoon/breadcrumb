@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breadcrumb Implement"
+  short_description: "Implement and verify a ready Breadcrumb design"
+  default_prompt: "Use $breadcrumb-implement to implement this ready design."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breadcrumb Open"
+  short_description: "Turn a request into a durable requirement issue"
+  default_prompt: "Use $breadcrumb-open to capture this request as a requirement issue."

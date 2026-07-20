@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breadcrumb PR"
+  short_description: "Publish the current branch as a pull request"
+  default_prompt: "Use $breadcrumb-pr to create a pull request for this branch."
