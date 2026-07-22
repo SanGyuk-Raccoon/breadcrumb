@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from . import SCHEMA_VERSION
+from . import SCRIPT_OUTPUT_SCHEMA_VERSION
 from .documents import DocumentProblem, IssueStatus, parse_issue_status
 from .errors import BreadcrumbOperationalError
 from .footprints import Footprint, parse_footprint
@@ -376,7 +376,7 @@ def get_issue_progress(
         if number in error_by_number
     ]
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": SCRIPT_OUTPUT_SCHEMA_VERSION,
         "hostname": client.target.hostname,
         "repository": client.target.identity,
         "requirements": requirement_results,

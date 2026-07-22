@@ -114,19 +114,18 @@ If the file is missing, stale, or conflicts with the current worktree, a no-HITL
 
 The plugin includes default templates under `plugins/breadcrumb/templates/`. Skills must load templates at runtime rather than embedding independent copies of the template text in each `SKILL.md`.
 
-Initial template set:
+Template set:
 
 ```text
 requirement.md
 design.md
-comment-refine.md
 comment-implementation.md
 pull-request.md
 ```
 
 Template reuse rules:
 
-- `breadcrumb-open` and `breadcrumb-refine` use the same `requirement.md`.
+- `breadcrumb-open` uses `requirement.md`. `breadcrumb-refine` edits the current requirement body in place so unrelated content and repository-specific structure remain intact.
 - All design phases use the same `design.md`. The state fields change, but the body structure does not.
 - `comment-implementation.md` includes the implementation summary and required `Verification Report` section.
 - Breadcrumb and normal pull requests use the same `pull-request.md`. For a Breadcrumb branch, `breadcrumb-pr` adds `Closes #<design-issue-number>` outside the rendered template body.
@@ -157,7 +156,7 @@ Template validation protects only Breadcrumb's machine contract. Repository over
 
 Validation timing:
 
-- `breadcrumb-init` resolves every required filename from the current repository and installed plugin environment, then validates all five selected templates.
+- `breadcrumb-init` resolves every required filename from the current repository and installed plugin environment, then validates all four selected templates.
 - Each skill reloads and validates the selected template immediately before using it.
 - After filling the template, the skill validates the complete rendered artifact with the strict
   issue or footprint parser immediately before publication.
@@ -176,9 +175,8 @@ Failure behavior:
 
 Required contracts:
 
-- `requirement.md` contains exactly one `breadcrumb:state:start` and `breadcrumb:state:end` pair, with `Todo` before `Breadcrumb Status`. Status contains `Schema Version`, `Type`, `Phase`, `Refined From`, and `Last Breadcrumb Step`; `Type` is `requirement`.
-- `design.md` has the same state structure and also contains `Related Requirement`; `Type` is `design`.
-- `comment-refine.md` contains exactly one Breadcrumb footprint whose step is `refine` and whose required fields are `version`, `issue`, and `replacement_issue`.
+- `requirement.md` contains exactly one `breadcrumb:state:start` and `breadcrumb:state:end` pair, with `Todo` before `Breadcrumb Status`. Status uses requirement document schema 2 and contains `Schema Version`, `Type`, `Phase`, and `Last Breadcrumb Step`; `Type` is `requirement`.
+- `design.md` uses design document schema 1 and contains `Schema Version`, `Type`, `Phase`, `Related Requirement`, `Refined From`, and `Last Breadcrumb Step`; `Type` is `design`.
 - `comment-implementation.md` contains exactly one Breadcrumb footprint whose step is `implement` and whose required fields are `version`, `issue`, `branch`, `commit`, and `verification`. It also contains exactly one `Verification Report` heading.
 - `pull-request.md` is non-empty and contains neither a Breadcrumb footprint nor a `Closes` reference. `breadcrumb-pr` adds those outside the rendered template only for a Breadcrumb branch.
 
@@ -394,7 +392,7 @@ MVP script set:
 ```text
 validate_breadcrumb_templates.py
 - Resolve templates using the repository override and bundled-template lookup order.
-- Validate one selected template for a skill or all five selected templates for `breadcrumb-init`.
+- Validate one selected template for a skill or all four selected templates for `breadcrumb-init`.
 - Return only schema version, validity, selected source paths, and structured validation errors.
 - Do not render content, validate generated artifacts, rewrite templates, or perform GitHub operations.
 
@@ -424,12 +422,14 @@ get_breadcrumb_issue_progress.py
 
 ### Script JSON Contracts
 
+The scripts' top-level `schema_version` is an output-contract version and remains `1`. It is
+independent from the `Schema Version` inside requirement or design issue bodies.
+
 The template validator accepts exactly one positional template type:
 
 ```text
 requirement
 design
-comment-refine
 comment-implementation
 pull-request
 all
@@ -444,7 +444,7 @@ python validate_breadcrumb_templates.py all
 
 Skills run the validator with the repository root as its working directory. The validator maps each type to its same-named `.md` file, checks `<cwd>/.breadcrumb/templates/<filename>` first, and otherwise checks `<script-plugin-root>/templates/<filename>`. It accepts no repository-root, plugin-root, filename, or mode option.
 
-`all` resolves each of the five files independently. A repository may override any subset, including only one file; the remaining files resolve to their bundled versions.
+`all` resolves each of the four files independently. A repository may override any subset, including only one file; the remaining files resolve to their bundled versions.
 
 The validator returns the same collection shape for one template and for all templates:
 
@@ -933,7 +933,7 @@ Breadcrumb uses two issue types.
 
 ### Requirement Issue
 
-Created by `breadcrumb-open` or `breadcrumb-refine`.
+Created by `breadcrumb-open` and updated in place by `breadcrumb-refine`.
 
 Purpose:
 
@@ -977,10 +977,9 @@ Use unchecked task-list items. Leave this section empty when nothing remains.
 
 ## Breadcrumb Status
 
-- Schema Version: 1
+- Schema Version: 2
 - Type: requirement
 - Phase: <draft-or-ready>
-- Refined From: <issue-reference-or-none>
 - Last Breadcrumb Step: <open-or-refine>
 <!-- breadcrumb:state:end -->
 ```
@@ -1113,10 +1112,11 @@ block, require exactly one `## Todo` followed by exactly one `## Breadcrumb Stat
 empty or consists only of non-empty task items matching `- [ ] <text>` or `- [x] <text>`; no other
 prose or heading is valid there.
 
-Status fields use exact `- <Field>: <value>` lines, appear once each, and follow the order shown in
-the bundled template. Reject unknown or duplicate fields. `Schema Version` is `1`; `Phase` is
-`draft` or `ready`; `Refined From` is `none` or `#<positive-integer>`; `Related Requirement` is a
-positive issue reference when required; and `Last Breadcrumb Step` is valid for the issue type.
+Status fields use exact `- <Field>: <value>` lines, appear once each, and follow the order for their
+type and document schema. Reject unknown or duplicate fields. Requirement schema 1 remains readable
+and contains `Refined From`; requirement schema 2 is the current authoring contract and omits it.
+Design schema 1 retains `Related Requirement` and `Refined From`. `Phase` is `draft` or `ready`;
+relationship fields are `none` where allowed or `#<positive-integer>`; and `Last Breadcrumb Step` is valid for the issue type.
 Require `draft` exactly when at least one unchecked Todo remains and `ready` otherwise. Whitespace
 outside exact reserved lines may vary only where ordinary Markdown permits it; it never changes a
 reserved key or heading.
@@ -1125,7 +1125,7 @@ The state markers, `Todo` and `Breadcrumb Status` headings, status field names, 
 
 ## Footprint Format
 
-Breadcrumb comments and Breadcrumb PR bodies include both:
+New Breadcrumb implementation comments and Breadcrumb PR bodies include both:
 
 - A machine-readable HTML comment for scripts.
 - A human-readable Markdown heading for people.
@@ -1171,7 +1171,9 @@ breadcrumb:
 ## Breadcrumb: Pull Request
 ```
 
-### Default `comment-refine.md`
+### Legacy refinement footprint
+
+Breadcrumb 0.1 created replacement requirements and recorded this footprint on the source issue:
 
 ```md
 <!--
@@ -1188,22 +1190,13 @@ Replaced by #<replacement-issue-number>.
 
 ### Reason
 
-<!-- template-guidance:
-Explain why the existing requirement could not remain as-is.
-Describe the changed understanding, constraint, or scope in one short paragraph.
--->
-
-### Material Changes
-
-<!-- template-guidance:
-List only meaningful differences introduced by the replacement requirement.
-Do not repeat the complete replacement issue.
--->
+Historical explanation.
 ```
 
-`Reason` explains why replacement was necessary. `Material Changes` summarizes only additions, changes, and removals needed to understand the lineage without comparing both complete issue bodies. Template guidance comments are omitted from the rendered comment.
-
-The footprint's `replacement_issue` must equal the new requirement issue number, and the new requirement's `Refined From` status field must point back to the footprint's `issue` number.
+Breadcrumb no longer generates refinement comments or replacement requirements. The parser retains
+this contract only to load historical lineage. A schema-1 replacement must point back through
+`Refined From`; a replacement migrated to requirement schema 2 has no reverse lineage field, so the
+trusted source comment remains historical outgoing lineage only.
 
 ### Default `comment-implementation.md`
 
@@ -1341,7 +1334,7 @@ Unknown fields are rejected for version 1. Adding a field to a footprint contrac
 
 After syntax validation, compare the footprint with its GitHub context:
 
-- A refine footprint's `issue` equals the issue carrying the comment, and its `replacement_issue` relationship agrees with the replacement requirement's `Refined From` field.
+- A legacy refine footprint's `issue` equals the issue carrying the comment. Its `replacement_issue` agrees with `Refined From` while the replacement remains requirement schema 1; after migration to schema 2, the trusted source comment is retained as outgoing historical lineage without a reverse field.
 - An implementation footprint's `issue` equals the design issue carrying the comment, and the issue number encoded in `branch` equals that value.
 - A PR footprint's `branch` equals the PR head branch, the issue number encoded in that branch equals `issue`, and the final `Closes #<number>` line equals that issue number.
 - An implementation `commit` records a historical verification point. It remains valid when the branch later advances to another HEAD.
@@ -1494,8 +1487,7 @@ breadcrumb-design
 ```
 
 - `breadcrumb-open` may create a requirement issue.
-- `breadcrumb-refine` creates the replacement requirement first, then comments on and closes the
-  old requirement issue. The new issue number is required by the refinement footprint.
+- `breadcrumb-refine` edits one open requirement issue title/body in place with one approved PATCH. It never creates a replacement issue or refinement comment and never changes issue state or labels.
 - `breadcrumb-design` may create, edit, or close a design issue and may close or reopen its related requirement issue.
 - `breadcrumb-design` does not add standalone comments. Phase and design content are persisted by writing the design issue body.
 
@@ -1672,7 +1664,7 @@ Input and source:
 
 Purpose:
 
-- Refine a requirement issue into a new requirement issue.
+- Refine an open requirement issue in place.
 - Requirement-only. Do not refine design issues.
 
 Behavior:
@@ -1681,15 +1673,13 @@ Behavior:
 - Identify what to keep, remove, and change.
 - Ask one question at a time.
 - If unfinished questions or work remain, write them as unchecked Todo items.
-- On approval, create the replacement requirement, comment on the old requirement with the resulting issue number, and then close the old requirement.
+- Stop if an open design still relates to the requirement.
+- Preserve unrelated body content and migrate schema-1 requirements to schema 2.
+- On approval, update only the existing issue title and body with one PATCH.
 
-Side effects:
+Side effect:
 
-- Create new requirement issue.
-- Add label `breadcrumb:requirement`.
-- Set `Refined From` on the new issue.
-- Add refine comment to old requirement issue.
-- Close old requirement issue.
+- Update the existing requirement title and body.
 
 ### breadcrumb-design
 
@@ -1941,7 +1931,7 @@ Breadcrumb does not guarantee complete idempotency. The MVP prevents only duplic
 Strong identity checks include:
 
 - A design issue's `Related Requirement` field.
-- A refinement comment's source and `replacement_issue` footprint fields.
+- A legacy refinement comment's source and `replacement_issue` footprint fields when loading historical lineage.
 - A deterministic implementation branch name.
 - An implementation comment's design issue, branch, and HEAD fields.
 - An open pull request's head and base branches.
@@ -2002,9 +1992,9 @@ Requirement issue:
 ```text
 created by open
 -> draft or ready
+-> edited in place by refine and written as requirement document schema 2
 -> closed when a ready design issue is created
 -> reopened if design later discovers requirement problems
--> closed when refined into a new requirement issue
 ```
 
 Design issue:

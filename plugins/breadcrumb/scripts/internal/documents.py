@@ -5,6 +5,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from . import (
+    SUPPORTED_DESIGN_DOCUMENT_SCHEMA_VERSIONS,
+    SUPPORTED_REQUIREMENT_DOCUMENT_SCHEMA_VERSIONS,
+)
 from .footprints import normalize_markdown
 
 
@@ -30,6 +34,7 @@ class DocumentProblem(Exception):
 
 @dataclass(frozen=True)
 class IssueStatus:
+    schema_version: int
     issue_type: str
     phase: str
     related_requirement: int | None
@@ -113,14 +118,43 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
         fields[name] = (value, absolute_line)
         field_order.append(name)
 
-    required = [
-        "Schema Version",
-        "Type",
-        "Phase",
-    ]
+    base_required = ["Schema Version", "Type", "Phase"]
+    for name in base_required:
+        if name not in fields:
+            raise DocumentProblem(
+                "missing_field", f"Breadcrumb Status field {name} is missing"
+            )
+
+    issue_type = fields["Type"][0]
+    if issue_type not in {"requirement", "design"} or issue_type != expected_type:
+        raise DocumentProblem(
+            "invalid_type",
+            f"Breadcrumb Type must be {expected_type}",
+            fields["Type"][1],
+        )
+
+    supported_versions = (
+        SUPPORTED_REQUIREMENT_DOCUMENT_SCHEMA_VERSIONS
+        if expected_type == "requirement"
+        else SUPPORTED_DESIGN_DOCUMENT_SCHEMA_VERSIONS
+    )
+    schema_value = fields["Schema Version"][0]
+    allowed_schema_values = {str(version) for version in supported_versions}
+    if schema_value not in allowed_schema_values:
+        allowed = " or ".join(sorted(allowed_schema_values))
+        raise DocumentProblem(
+            "invalid_schema_version",
+            f"Breadcrumb Schema Version must be {allowed} for {expected_type}",
+            fields["Schema Version"][1],
+        )
+    schema_version = int(schema_value)
+
+    required = list(base_required)
     if expected_type == "design":
-        required.append("Related Requirement")
-    required.extend(("Refined From", "Last Breadcrumb Step"))
+        required.extend(("Related Requirement", "Refined From"))
+    elif schema_version == 1:
+        required.append("Refined From")
+    required.append("Last Breadcrumb Step")
     for name in required:
         if name not in fields:
             raise DocumentProblem(
@@ -147,19 +181,6 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
             fields[name][1],
         )
 
-    if fields["Schema Version"][0] != "1":
-        raise DocumentProblem(
-            "invalid_schema_version",
-            "Breadcrumb Schema Version must be 1",
-            fields["Schema Version"][1],
-        )
-    issue_type = fields["Type"][0]
-    if issue_type not in {"requirement", "design"} or issue_type != expected_type:
-        raise DocumentProblem(
-            "invalid_type",
-            f"Breadcrumb Type must be {expected_type}",
-            fields["Type"][1],
-        )
     phase = fields["Phase"][0]
     if phase not in {"draft", "ready"}:
         raise DocumentProblem(
@@ -175,18 +196,18 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
             fields["Phase"][1],
         )
 
-    refined_value = fields["Refined From"][0]
-    if refined_value == "none":
-        refined_from = None
-    else:
-        refined_match = _ISSUE_REFERENCE_RE.fullmatch(refined_value)
-        if not refined_match:
-            raise DocumentProblem(
-                "invalid_refined_from",
-                "Refined From must be none or a positive issue reference",
-                fields["Refined From"][1],
-            )
-        refined_from = int(refined_match.group(1))
+    refined_from = None
+    if "Refined From" in fields:
+        refined_value = fields["Refined From"][0]
+        if refined_value != "none":
+            refined_match = _ISSUE_REFERENCE_RE.fullmatch(refined_value)
+            if not refined_match:
+                raise DocumentProblem(
+                    "invalid_refined_from",
+                    "Refined From must be none or a positive issue reference",
+                    fields["Refined From"][1],
+                )
+            refined_from = int(refined_match.group(1))
 
     last_step = fields["Last Breadcrumb Step"][0]
     allowed_last_steps = {"open", "refine"} if expected_type == "requirement" else {"design"}
@@ -209,6 +230,7 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
         related_requirement = int(related_match.group(1))
 
     return IssueStatus(
+        schema_version=schema_version,
         issue_type=issue_type,
         phase=phase,
         related_requirement=related_requirement,

@@ -6,5 +6,5 @@
   "labels": [
     {"name": "breadcrumb:requirement"}
   ],
-  "body": "## Background\n\nProtect login.\n\n<!-- breadcrumb:state:start -->\n## Todo\n\n- [x] Confirm the threshold\n\n## Breadcrumb Status\n\n- Schema Version: 1\n- Type: requirement\n- Phase: ready\n- Refined From: none\n- Last Breadcrumb Step: open\n<!-- breadcrumb:state:end -->"
+  "body": "## Background\n\nProtect login.\n\n<!-- breadcrumb:state:start -->\n## Todo\n\n- [x] Confirm the threshold\n\n## Breadcrumb Status\n\n- Schema Version: 2\n- Type: requirement\n- Phase: ready\n- Last Breadcrumb Step: open\n<!-- breadcrumb:state:end -->"
 }

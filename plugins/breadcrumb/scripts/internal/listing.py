@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from . import SCHEMA_VERSION
+from . import SCRIPT_OUTPUT_SCHEMA_VERSION
 from .errors import BreadcrumbOperationalError
 from .github import GitHubClient
 
@@ -84,7 +84,7 @@ def list_issue_numbers(client: GitHubClient, type_filter: str) -> dict[str, obje
             designs.append(number)
 
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": SCRIPT_OUTPUT_SCHEMA_VERSION,
         "hostname": client.target.hostname,
         "repository": client.target.identity,
         "filter": type_filter,

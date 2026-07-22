@@ -25,7 +25,7 @@ class TemplateValidationTests(unittest.TestCase):
                 plugin_root=PLUGIN_ROOT,
             )
         self.assertTrue(result["valid"])
-        self.assertEqual(len(result["templates"]), 5)
+        self.assertEqual(len(result["templates"]), 4)
         self.assertTrue(all(item["source"] == "plugin" for item in result["templates"]))
 
     def test_repository_override_is_selected_independently(self) -> None:
@@ -107,6 +107,27 @@ class TemplateValidationTests(unittest.TestCase):
         )
         self.assertEqual(pull_errors[0].code, "forbidden_pr_metadata")
 
+    def test_legacy_requirement_override_requires_schema_two(self) -> None:
+        requirement = (PLUGIN_ROOT / "templates" / "requirement.md").read_text(
+            encoding="utf-8"
+        )
+        legacy_requirement = requirement.replace(
+            "- Schema Version: 2", "- Schema Version: 1"
+        ).replace(
+            "- Last Breadcrumb Step: <open-or-refine>",
+            "- Refined From: <issue-reference-or-none>\n"
+            "- Last Breadcrumb Step: <open-or-refine>",
+        )
+        errors = validate_template(
+            "requirement",
+            legacy_requirement,
+        )
+        self.assertIn("invalid_schema_version", {error.code for error in errors})
+        self.assertIn(
+            "unknown Breadcrumb Status field Refined From",
+            {error.message for error in errors},
+        )
+
     def test_ordinary_template_content_is_not_executed_or_interpreted(self) -> None:
         pull = "## Summary\n\n`$(touch should-not-exist)` is ordinary Markdown.\n"
         self.assertEqual(validate_template("pull-request", pull), [])
@@ -118,8 +139,8 @@ class TemplateValidationTests(unittest.TestCase):
         variants = (
             requirement.replace("## Todo", " ## Todo"),
             requirement.replace(
-                "- Schema Version: 1\n- Type: requirement",
-                "- Type: requirement\n- Schema Version: 1",
+                "- Schema Version: 2\n- Type: requirement",
+                "- Type: requirement\n- Schema Version: 2",
             ),
             requirement.replace(
                 "- Last Breadcrumb Step: <open-or-refine>",

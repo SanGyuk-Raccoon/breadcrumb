@@ -1,4 +1,4 @@
 interface:
   display_name: "Breadcrumb Refine"
-  short_description: "Replace and refine a requirement issue safely"
-  default_prompt: "Use $breadcrumb-refine to refine this requirement issue."
+  short_description: "Refine a requirement issue in place safely"
+  default_prompt: "Use $breadcrumb-refine to clarify and update this requirement issue in place."

@@ -31,9 +31,8 @@ Use unchecked task-list items. Leave this section empty when nothing remains.
 
 ## Breadcrumb Status
 
-- Schema Version: 1
+- Schema Version: 2
 - Type: requirement
 - Phase: <draft-or-ready>
-- Refined From: <issue-reference-or-none>
 - Last Breadcrumb Step: <open-or-refine>
 <!-- breadcrumb:state:end -->

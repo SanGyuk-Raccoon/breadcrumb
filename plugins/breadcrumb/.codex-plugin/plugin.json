@@ -1,6 +1,6 @@
 {
   "name": "breadcrumb",
-  "version": "0.1.0",
+  "version": "0.2.0+codex.20260722154208",
   "description": "GitHub issue based durable-memory workflow for AI-assisted development",
   "author": {
     "name": "Breadcrumb contributors"

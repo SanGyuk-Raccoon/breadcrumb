@@ -8,7 +8,7 @@ import sys
 from collections.abc import Mapping
 from typing import NoReturn
 
-from . import SCHEMA_VERSION
+from . import SCRIPT_OUTPUT_SCHEMA_VERSION
 from .errors import CliUsageError, sanitized
 
 
@@ -30,7 +30,7 @@ def write_diagnostic(message: object) -> None:
 
 def operational_error(code: str, message: object) -> dict[str, object]:
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": SCRIPT_OUTPUT_SCHEMA_VERSION,
         "error": {
             "code": code,
             "message": sanitized(message),

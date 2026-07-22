@@ -45,6 +45,12 @@ class ErrorContractTests(unittest.TestCase):
         self.assertEqual(exit_code, 2)
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
 
+    def test_template_rejects_removed_comment_refine_type(self) -> None:
+        exit_code, payload, _ = invoke(template_cli.main, ["comment-refine"])
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["error"]["code"], "invalid_arguments")
+
     def test_operational_error_redacts_environment_token(self) -> None:
         with mock.patch.dict(
             os.environ,

@@ -40,6 +40,21 @@ class FootprintTests(unittest.TestCase):
         self.assertEqual(result.outcome, "valid")
         self.assertEqual(result.footprint.branch, "breadcrumb/21-login-rate-limit")
 
+    def test_valid_legacy_refine_footprint(self) -> None:
+        body = """<!--
+breadcrumb:
+  version: 1
+  step: refine
+  issue: 11
+  replacement_issue: 12
+-->
+
+## Breadcrumb: Refinement
+"""
+        result = parse_footprint(body, expected_step="refine", expected_issue=11)
+        self.assertEqual(result.outcome, "valid")
+        self.assertEqual(result.footprint.replacement_issue, 12)
+
     def test_non_footprint_first_block_is_ignored(self) -> None:
         result = parse_footprint("## Heading\n\n" + implementation_body())
         self.assertEqual(result.outcome, "not-breadcrumb")

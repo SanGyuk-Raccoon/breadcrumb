@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "template_type",
         metavar="TEMPLATE_TYPE",
-        help="requirement, design, comment-refine, comment-implementation, pull-request, or all",
+        help="requirement, design, comment-implementation, pull-request, or all",
     )
     try:
         arguments = parser.parse_args(argv)

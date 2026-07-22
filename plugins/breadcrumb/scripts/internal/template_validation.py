@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from . import SCHEMA_VERSION
+from . import (
+    CURRENT_DESIGN_DOCUMENT_SCHEMA_VERSION,
+    CURRENT_REQUIREMENT_DOCUMENT_SCHEMA_VERSION,
+    SCRIPT_OUTPUT_SCHEMA_VERSION,
+)
 from .documents import STATE_END, STATE_START, STATUS_HEADING, TODO_HEADING
 from .errors import BreadcrumbOperationalError
 from .footprints import (
@@ -22,7 +26,6 @@ from .footprints import (
 TEMPLATE_TYPES = (
     "requirement",
     "design",
-    "comment-refine",
     "comment-implementation",
     "pull-request",
 )
@@ -179,11 +182,11 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
         "Schema Version",
         "Type",
         "Phase",
-        "Refined From",
         "Last Breadcrumb Step",
     ]
     if template == "design":
         required.insert(3, "Related Requirement")
+        required.insert(4, "Refined From")
     for name in required:
         values = fields.get(name, [])
         if not values:
@@ -244,12 +247,17 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
             )
         )
     version_values = fields.get("Schema Version", [])
-    if len(version_values) == 1 and version_values[0][0] != "1":
+    expected_version = (
+        CURRENT_REQUIREMENT_DOCUMENT_SCHEMA_VERSION
+        if template == "requirement"
+        else CURRENT_DESIGN_DOCUMENT_SCHEMA_VERSION
+    )
+    if len(version_values) == 1 and version_values[0][0] != str(expected_version):
         errors.append(
             _error(
                 template,
-                "missing_field",
-                "Breadcrumb Status Schema Version must be 1",
+                "invalid_schema_version",
+                f"Breadcrumb Status Schema Version must be {expected_version}",
                 version_values[0][1],
             )
         )
@@ -268,19 +276,20 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
                 phase_values[0][1],
             )
         )
-    refined_values = fields.get("Refined From", [])
-    if len(refined_values) == 1 and not (
-        refined_values[0][0] in {"none", "<issue-reference-or-none>"}
-        or _ISSUE_REFERENCE_RE.fullmatch(refined_values[0][0])
-    ):
-        errors.append(
-            _error(
-                template,
-                "missing_field",
-                "Breadcrumb Status Refined From value is invalid",
-                refined_values[0][1],
+    if template == "design":
+        refined_values = fields.get("Refined From", [])
+        if len(refined_values) == 1 and not (
+            refined_values[0][0] in {"none", "<issue-reference-or-none>"}
+            or _ISSUE_REFERENCE_RE.fullmatch(refined_values[0][0])
+        ):
+            errors.append(
+                _error(
+                    template,
+                    "missing_field",
+                    "Breadcrumb Status Refined From value is invalid",
+                    refined_values[0][1],
+                )
             )
-        )
     last_values = fields.get("Last Breadcrumb Step", [])
     allowed_last = (
         {"open", "refine", "<open-or-refine>"}
@@ -317,24 +326,22 @@ def validate_template(template: str, text: str) -> list[ValidationError]:
     if template in {"requirement", "design"}:
         return _validate_state_template(template, text)
 
-    if template in {"comment-refine", "comment-implementation"}:
-        expected_step = "refine" if template == "comment-refine" else "implement"
+    if template == "comment-implementation":
         errors = [
             _error(template, problem.code, problem.message, problem.line)
-            for problem in validate_template_footprint(text, expected_step)
+            for problem in validate_template_footprint(text, "implement")
         ]
-        if template == "comment-implementation":
-            headings = list(_VERIFICATION_HEADING_RE.finditer(normalize_markdown(text)))
-            if len(headings) != 1:
-                message = (
-                    "Verification Report heading is missing"
-                    if not headings
-                    else "Verification Report heading appears more than once"
-                )
-                line = None
-                if len(headings) > 1:
-                    line = normalize_markdown(text)[: headings[1].start()].count("\n") + 1
-                errors.append(_error(template, "missing_heading", message, line))
+        headings = list(_VERIFICATION_HEADING_RE.finditer(normalize_markdown(text)))
+        if len(headings) != 1:
+            message = (
+                "Verification Report heading is missing"
+                if not headings
+                else "Verification Report heading appears more than once"
+            )
+            line = None
+            if len(headings) > 1:
+                line = normalize_markdown(text)[: headings[1].start()].count("\n") + 1
+            errors.append(_error(template, "missing_heading", message, line))
         return errors
 
     if template == "pull-request":
@@ -484,7 +491,7 @@ def validate_active_templates(
         all_errors.extend(errors)
 
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": SCRIPT_OUTPUT_SCHEMA_VERSION,
         "valid": not all_errors,
         "templates": templates,
         "errors": [error.as_json() for error in all_errors],

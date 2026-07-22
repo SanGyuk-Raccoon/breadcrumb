@@ -24,7 +24,7 @@ Produce a session-only evidence-based review. Never apply or persist findings.
 
 ## Review A Requirement
 
-1. Load the complete requirement issue when one is targeted. Verify exactly one requirement type label, one final state block, schema/type fields, valid Todo task syntax, and Phase/Todo consistency.
+1. Load the complete requirement issue when one is targeted. Verify exactly one requirement type label, one final state block, requirement document schema 1 or 2, valid Todo task syntax, and Phase/Todo consistency.
 2. Evaluate whether Background explains the need, Requirements establish behavior and material boundaries without accidental design, and Acceptance Criteria are observable and independently verifiable.
 3. Find ambiguity, contradictions, missing actors/states/failure behavior, scope holes, unverifiable criteria, and unrecorded constraints.
 4. Distinguish design questions from requirement defects. Recommend `breadcrumb-refine` only when durable requirement meaning must change.

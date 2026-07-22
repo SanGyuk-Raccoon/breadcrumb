@@ -35,7 +35,7 @@ Turn the current request into one approved requirement issue. Use conversation a
    - Remove only complete HTML comments beginning with `<!-- template-guidance:` and ending with `-->`.
    - Preserve state markers and every other HTML comment.
    - Keep the control block last, in the template's fixed order.
-   - Set `Schema Version` to `1`, `Type` to `requirement`, `Refined From` to `none`, and `Last Breadcrumb Step` to `open`.
+   - Set `Schema Version` to `2`, `Type` to `requirement`, and `Last Breadcrumb Step` to `open`. Do not add `Refined From`.
    - Set Phase to `draft` when any unchecked Todo remains; otherwise set it to `ready`. Keep Todo empty or completed-only for `ready`.
 6. Show the complete proposed title, rendered body, label, and intended repository. Request explicit approval for that exact issue creation.
 7. Before showing or publishing, apply the strict issue-state contract to normalized UTF-8/line endings: require exact markers once, only whitespace after the end marker, Todo then Status, exact ordered required fields with no unknowns/duplicates, only valid task items, and consistent Phase. Reject authored exact marker lines, reserved control headings/fields, complete Breadcrumb footprints, `template-guidance` blocks, or extra content after the end marker.
