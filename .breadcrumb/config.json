@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "github": {
+    "hostname": "github.com",
+    "owner": "SanGyuk-Raccoon",
+    "repository": "breadcrumb"
+  },
+  "git": {
+    "remote": "origin",
+    "default_branch": "main"
+  }
+}
