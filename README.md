@@ -612,12 +612,15 @@ Commands run from the repository root unless the surrounding guidance specifies 
 
 `breadcrumb-implement` reads the file as natural-language instructions rather than parsing it as a formal data format. It determines which checks apply to the implementation, runs the available commands, and records what was run and which non-CI checks remain dependent on manual verification or another external system. Checks performed exclusively by pull request CI are omitted from the implementation comment because GitHub Checks already provide their durable record. Verification results are implementation records, not a gate enforced by `breadcrumb-pr`.
 
-Users may edit `.breadcrumb/verification.md` directly, but implementation requires both it and
-`.breadcrumb/config.json` to be regular files inside the repository and to match the current HEAD.
-If either is untracked, modified, symlinked outside the repository, or conflicts with the configured
-remote, stop before running commands and recommend `breadcrumb-init` (or an intentional user commit).
-Each `breadcrumb-implement` run reloads the current committed file instead of relying on a previous
-session or cached copy, then applies the Trust Boundary command checks.
+Users may edit `.breadcrumb/verification.md` directly. Init may keep both setup files as recognized
+local-only files ignored by in-repository `.gitignore` files, but implementation requires them to be
+regular tracked files that match the current HEAD and the fetched remote default branch. A valid
+local-only setup causes implementation to stop before branch or code mutation and recommend
+`breadcrumb-init` local-only-to-track conversion plus publication through an explicitly requested
+init push or the repository's normal pull-request process. Mixed tracking, external-only ignore,
+local modification, symlinks, malformed identity, and other inconsistent states use normal init
+repair guidance. Each implementation run reloads the durable committed file rather than using a
+previous session or cached copy, then applies the Trust Boundary command checks.
 
 ### Verification Report
 
@@ -673,13 +676,14 @@ Based on that evidence, `breadcrumb-init` proposes repository verification entri
 - Any working directory or setup guidance needed to run the command.
 - A natural-language note when the check exists only in CI or requires manual verification.
 
-For every proposed item, identify the repository evidence that supports it. Then use HITL to review the proposal one item at a time:
-
-- Accept: include the proposed item.
-- Modify: revise it with the user's instruction, then confirm the revision.
-- Exclude: omit it from the repository verification policy.
-
-Only approved items are written to `.breadcrumb/verification.md`. If repository evidence is missing, conflicting, or ambiguous, ask the user rather than guessing. If `.breadcrumb/verification.md` already exists, compare it with the current codebase and propose only additions, removals, or corrections; do not replace confirmed instructions wholesale.
+For every proposed item, identify the repository evidence that supports it. Collect all clear items
+into the complete verification content or diff shown in the integrated setup plan; do not ask for
+item-by-item accept, modify, or exclude decisions. If repository evidence is genuinely missing,
+conflicting, or ambiguous in a way that changes command, environment, applicability, or scope, ask
+one focused question rather than guessing. If `.breadcrumb/verification.md` already exists, preserve
+supported guidance and propose only evidence-backed additions, removals, or corrections. The user
+approves or revises the complete verification proposal together with the rest of the setup plan; a
+revision causes the full plan to be rendered again.
 
 Discovery is read-only. Do not execute a test or setup command during `breadcrumb-init` merely to discover whether it is valid. If running a command would materially help validate a proposed instruction, explain the command and its side effects and ask for separate approval before running it.
 
@@ -687,7 +691,10 @@ Discovery is read-only. Do not execute a test or setup command during `breadcrum
 
 ## Initialization Preflight Policy
 
-`breadcrumb-init` performs a runtime, Git, and GitHub preflight before the repository is considered ready for the Breadcrumb workflow. It must not create test issues, branches, commits, or pull requests merely to probe access.
+`breadcrumb-init` performs read-only runtime, Git, GitHub, template, storage, and verification
+discovery before evaluating the user's selected local initialization plan. The result describes that
+local plan, not permanent readiness for every future Breadcrumb mutation. Init never creates test
+issues, branches, commits, pushes, or pull requests merely to probe access.
 
 Bootstrap checks run before any Python script:
 
@@ -700,22 +707,66 @@ Bootstrap checks run before any Python script:
 Repository checks:
 
 - The current directory is inside a Git worktree.
-- The repository has a resolvable root and at least one commit from which an implementation branch can be created.
+- The repository has a resolvable root and either a usable commit or an empty local/remote state from
+  which a separately approved initial baseline can be created if the setup plan needs a commit.
 - A GitHub remote can be resolved to a single owner and repository. If multiple GitHub remotes are plausible, ask the user which one Breadcrumb should use.
 - The GitHub repository is reachable through `gh api` for the selected host.
 - The repository default branch can be determined.
+- The complete worktree/index snapshot and both setup files' regular-file, tracking, staged,
+  modification, and ignore-provenance state are known before planning a write.
+- Existing tracked mode and recognized local-only mode are preserved without a storage question;
+  new or conflicting state requires one track-or-local-only choice, with track recommended.
 
-GitHub feature and access checks:
+GitHub and plan checks:
 
-- The active GitHub identity is authenticated and can read repository metadata.
-- GitHub Issues are enabled.
-- Issues, issue comments, labels, and issue timeline events can be read.
-- Requirement and design issues can be created, edited, commented on where allowed, closed, and reopened.
-- The labels `breadcrumb:requirement` and `breadcrumb:design` exist and can be applied.
-- Implementation branches matching `breadcrumb/*` can be created and pushed.
-- Existing implementation branches can be updated. Whether force updates required by `start over` are permitted must be checked separately.
-- Pull requests can be read and created.
-- Active repository or organization rulesets and branch protection that may restrict `breadcrumb/*` branch creation, updates, force pushes, or PR creation are inspected when the active identity can read them.
+- The active GitHub identity can authenticate and read the selected repository metadata.
+- Issues availability, both exact Breadcrumb labels and variants, relevant collections, permissions,
+  and visible rules are collected through safe GET requests without approval.
+- Missing labels, case-only names, and metadata differences become exact desired-state operations in
+  the integrated plan. The underlying label-write capability matters only when such an operation is
+  selected.
+- Future issue/comment writes, implementation branch updates, push, force-update, and PR creation
+  that are outside the selected local plan are recorded as deferred rather than initialization
+  warnings. The owning later skill rechecks them before mutation.
+
+Storage mode is resolved from Git evidence:
+
+- Both regular setup files tracked means `track`; keep it without asking.
+- Both regular setup files untracked and ignored by regular in-repository `.gitignore` files means
+  `local-only`; keep it without asking. Global excludes and `.git/info/exclude` are not valid
+  repository evidence.
+- New, missing, mixed, external-only-ignore, or otherwise conflicting evidence requires one storage
+  choice, with track recommended. Do not ask again after the choice.
+- Tracked-to-local-only conversion is out of scope. Local-only-to-track preserves ignore rules and
+  force-adds only the two approved setup files after overlap/staged checks.
+
+When local-only needs repository rules, use only:
+
+```gitignore
+/.breadcrumb/config.json
+/.breadcrumb/verification.md
+```
+
+Do not add equivalent duplicate rules. The integrated plan shows exact label operations, complete
+verification/config/ignore content or diff, mode, write/staged/commit paths, commit message or
+no-commit result, current capability exceptions, deferred groups, and fixed operation order. One
+approval covers those deterministic actions. Track mode commits only changed setup files;
+local-only never stages them and commits only a newly changed root `.gitignore`. Existing staged
+entries or pre-existing changes overlapping a planned write block mutation, unrelated
+unstaged/untracked work is preserved, and no-op plans create no empty commit. An unchanged validated
+local-only file approved only as the source of an exact track transition is not a planned write.
+
+Before approving a plan with a nonempty repository commit, init fetches the configured remote
+default branch. A nonempty remote requires an attached current branch equal to the configured
+default branch and a pre-plan `HEAD` exactly equal to the fetched remote commit. Init does not
+switch, merge, rebase, reset, or publish existing commits to satisfy this gate. If both local and
+remote are empty, an exact initial root baseline is a separate prerequisite action: show and approve
+its branch, path set, staged diff, and message, then stage only those paths and create it once. An
+explicitly shown and approved zero-path root commit is permitted; existing files are never inferred
+into its scope, and the index must be empty before staging. Other empty-remote/local-history
+combinations require manual reconciliation. A
+no-commit setup or re-audit does not mutate merely to establish a baseline, and an unpublished local
+commit remains informational.
 
 ### Non-Destructive Probe Matrix
 
@@ -795,60 +846,62 @@ permissions.push
 permissions.admin
 ```
 
-Capability classification:
-
-- Runtime, repository, remote read, API read, and label-read capabilities are `ready` when their direct probe succeeds.
-- A missing executable, unsupported Python version, missing worktree or commit, unreachable repository, invalid authentication, archived or disabled repository, disabled Issues feature, or `permissions.pull: false` is `blocked` for the affected workflow.
-- A missing Breadcrumb label with no case-only variant is `blocked` until the separately approved label remediation succeeds. A case-only variant is usable as `ready with warnings` and may be renamed only after approval.
-- For stored OAuth, a repository-capable granted scope plus a write-capable repository role may classify matching Issue, Comment, Label, Contents, and PR API operations as `ready` when no visible repository rule blocks them.
-- For a fine-grained environment token, successful targeted reads are `ready`. Write grants that GitHub does not expose through available metadata remain `unverified` until the first real mutation.
-- Git push is `blocked` when the repository role or an active visible rule denies it. Otherwise it remains `unverified` because remote read authentication does not prove push authorization.
-- Force update for `start over` is a separate capability. An active non-fast-forward restriction makes it `blocked`; otherwise it remains `unverified` until needed.
-- A rules endpoint that cannot be read makes the affected branch capability `unverified`, not `ready`.
-
-Preflight output is a table with exactly these columns:
-
-```text
-Capability | State | Evidence | Remediation
-```
-
-Evidence is concise and identifies the command or API field that produced the state without including credentials or full API bodies. Remediation is empty for `ready`, gives the next approved HITL action for `blocked`, and explains the runtime check or manual confirmation for `unverified`.
-
-Do not treat `unverified` as a failed initialization. It contributes to `ready with warnings`; the owning skill rechecks the relevant current state and reports the actual mutation result when that capability is first exercised.
-
-Capability results use these states:
+Capability state is evaluated against the selected local setup plan:
 
 ```text
 ready
-- The required configuration and access were verified without mutation.
+- A capability required by the plan was proved safely or confirmed by its successful planned operation.
 
 blocked
-- A required capability is missing or a repository setting prevents it.
+- A required prerequisite or planned capability is absent, denied, failed, or uncertain.
 
 unverified
-- The `gh api` preflight cannot prove the capability non-destructively, or the identity cannot inspect the relevant rules.
+- A capability required by this plan cannot be proved non-destructively but is not known to be denied.
+
+deferred
+- The capability belongs only to future work outside the selected local plan.
 ```
 
-Overall preflight result:
+Runtime, repository, remote read, API read, template, storage, and label-read capabilities are ready
+when their direct checks succeed. Missing runtime or repository prerequisites, invalid auth,
+unreachable/archived/disabled repository, disabled Issues, or a visible denial of a required plan
+operation is blocked. A missing or mismatched label is desired state in the integrated plan rather
+than itself a capability failure; the label-write capability is required only when that operation is
+planned. A fine-grained-token write that cannot be proved through available metadata may remain
+unverified until the planned mutation confirms it.
 
-- `ready`: every required capability is `ready`.
-- `ready with warnings`: no capability is `blocked`, but at least one is `unverified`.
-- `blocked`: at least one required capability is `blocked`.
+Push, force-update, PR creation, and issue/comment/implementation-branch writes outside the current
+plan are deferred. Their unreadable rules or unverified grants do not lower the init result; the
+owning skill rechecks them when needed.
 
-A blocked preflight may still report or update local verification guidance, but it must not claim that the repository is ready for the complete Breadcrumb workflow.
+Overall local initialization result:
 
-After approved setup, calculate the final initialization result again. Even when all access
-capabilities are ready, the complete workflow remains `blocked` until the configured remote default
-branch contains the approved `config.json` and `verification.md`; a local-only commit is reported
-separately and never described as cross-session ready.
+- `ready`: every required plan step completed and no relevant warning remains.
+- `ready with warnings`: a capability needed by the selected result remains unverified but does not
+  prevent local completion.
+- `blocked`: a required prerequisite or planned step is incomplete, denied, failed, or uncertain.
 
-For a fine-grained environment token, the expected capability groups are repository metadata read, Issues read/write, Contents read/write, and Pull requests read/write. Breadcrumb should request the narrowest permissions needed by the `git` and `gh api` backend.
+Local-only worktree scope and an unpublished tracked commit are reported as information, not as
+warnings or blockers. They still matter to later skills: implementation stops until both files are
+tracked and published on the remote default branch.
 
-When a check is `blocked` or `unverified`, `breadcrumb-init` explains what is missing, why Breadcrumb needs it, and how it can be configured or verified.
+The full `Capability | State | Evidence | Remediation` table is shown only for diagnosis or when the
+user requests it. Normal output summarizes actual blockers, relevant warnings, and deferred groups.
+Evidence remains concise and credential-free. Request only the narrowest permission needed by a
+selected operation; never request future capability merely to improve the init status.
+
+Init does not ask about or perform push by default. When the user explicitly requests publication,
+local initialization finishes first; init then refetches the remote/default branch, shows the exact
+non-force ref update, and obtains a separate approval before one push. A push failure is reported
+separately and does not roll back or downgrade the completed local result. If policy requires a pull
+request, init does not create one and instead reports the normal repository publication path.
 
 ### HITL Remediation
 
-When Breadcrumb can safely perform a missing setup step with the active user's existing authority, `breadcrumb-init` offers to perform it through HITL. The boundary is whether the action needs new authority or a credential interaction that only the user can complete.
+Separate remediation is reserved for prerequisites that cannot safely be folded into the integrated
+setup plan. The boundary is whether an action acquires authority, changes repository identity or
+remote state, installs runtime support, enables Issues, is destructive, or otherwise falls outside
+the deterministic label/file/commit plan.
 
 Rules:
 
@@ -859,19 +912,37 @@ Rules:
 - If approved, perform the exact action once and rerun the affected checks.
 - If declined, leave the setting unchanged and provide manual setup instructions.
 
-#### Approval-Only Actions
+#### Separate Prerequisite Actions
 
 `breadcrumb-init` may perform these actions after the user approves the exact change, provided the current process can complete them without acquiring new authority or collecting a credential:
 
 - Install or upgrade Python to a supported version using an available trusted platform package manager.
 - Initialize the current directory as a Git repository.
 - Select the configured default branch name for an unborn repository.
-- Create an initial commit after showing the exact commit scope. Never stage existing files implicitly.
+- When a prospective setup plan needs a commit and both local and remote are empty, create one
+  initial root baseline only after showing and separately approving the configured branch, exact
+  path set, staged diff, and message. Stage only those paths; a zero-path commit must be explicitly
+  shown as empty. Require an empty index and never infer or stage existing files implicitly.
 - Add or correct the selected GitHub remote after showing the exact remote name and URL.
 - Enable GitHub Issues when the active identity has permission to change that repository feature.
-- Create missing Breadcrumb labels or correct their descriptions and colors after showing the exact metadata.
 
 If an action unexpectedly requests elevation, a password, a token, a key passphrase, or organization approval, Breadcrumb stops and reclassifies it as user-completed authorization.
+
+#### Integrated Setup Approval
+
+After prerequisites and material intent questions are resolved, init shows one complete plan with:
+
+- each required label's exact metadata and `none`, `create`, `case-only rename`, or `metadata update`
+  operation;
+- all evidence-backed verification guidance and its complete content or diff;
+- complete config, verification, and when needed root `.gitignore` content or diff;
+- selected track/local-only mode, exact write/staged/commit paths, commit message, or no-commit result;
+- current-plan blockers/warnings, deferred future capabilities, and fixed operation order.
+
+The user approves the complete plan or requests changes. Any change causes the whole plan to be
+rendered again. Approved label operations, file writes, validation, staging, and scoped commit do
+not receive repeated item-level approvals. Immediately before mutation, init rechecks every approved
+basis and stops on an existing staged entry, overlapping change, or post-approval state change.
 
 #### User-Completed Authorization
 
@@ -917,13 +988,15 @@ Every Breadcrumb issue has exactly one of these type labels. An issue with neith
 
 Label names are part of the machine contract. Descriptions and colors are recommended presentation metadata:
 
-- A missing exact label name with no case-only variant is `blocked`; `breadcrumb-init` shows the complete definition and offers to create it through HITL.
-- An existing label with the exact name is usable even when its description or color differs. Report `ready with warnings` and offer an optional metadata update through HITL.
-- Do not update label metadata without approval.
+- A missing exact label, a metadata difference, or a case-only name becomes an exact desired-state
+  operation in `breadcrumb-init`'s integrated setup plan. It is not by itself a blocker or warning;
+  an actual authority denial, failed operation, or uncertain result is.
+- Do not create, rename, or update label metadata without approval of the integrated plan containing
+  that exact operation.
 - A case-only variant does not satisfy the canonical display-name contract, and GitHub will not
-  allow a duplicate whose name differs only by case. Report `ready with warnings` and offer an
-  approved case-only rename. A spelling variant is a different label; preserve it and offer
-  creation of the required label. Never rename or delete either variant automatically.
+  allow a duplicate whose name differs only by case. Plan a case-only rename rather than duplicate
+  creation. A spelling variant is a different label; preserve it and plan creation of the required
+  exact label. Never rename a spelling variant or delete either variant automatically.
 
 Phase labels are not used. Phase is stored in the issue body.
 
@@ -1453,6 +1526,10 @@ Rules:
 
 - Ask one question at a time.
 - After each answer, reconsider whether ambiguity remains.
+- `breadcrumb-init` asks no approval for safe discovery. It asks only for unresolved repository or
+  storage intent and real verification-evidence conflicts, then obtains one approval for the exact
+  integrated label/file/commit plan. Prerequisites outside that plan retain separate scoped
+  approval.
 - Do not make arbitrary product, design, or implementation decisions.
 - If a later phase finds earlier-phase ambiguity, report it and send the work back to the right phase.
 - The initial `breadcrumb-implement` branch choice is the only implementation-stage HITL. After that choice, the skill must not ask further questions.
@@ -1471,12 +1548,17 @@ Breadcrumb repository configuration:
 breadcrumb-init only
 ```
 
-`breadcrumb-init` may create one separately approved initial commit when the repository has no
-commit, create `.breadcrumb/`, create or update `.breadcrumb/config.json` and
-`.breadcrumb/verification.md`, commit only those approved configuration files, offer an exact
-non-force push of the resulting configured default branch, and perform individually approved setup
-actions listed in HITL Remediation. It must not modify application code, create Breadcrumb issues or
-pull requests, or create implementation branches.
+`breadcrumb-init` may apply approved desired-state operations to the two Breadcrumb labels, create
+`.breadcrumb/`, and create or update `.breadcrumb/config.json` and
+`.breadcrumb/verification.md`. In track mode it stages only those changed setup files; in local-only
+mode it leaves them untracked and ignored and may stage/commit only the approved root `.gitignore`
+change. Its integrated plan creates no empty commit and never stages pre-existing or unrelated work;
+the only empty-commit exception is an explicitly shown and separately approved initial root baseline
+for an empty local/remote repository. Runtime, authentication, repository/remote, Issues, and other
+prerequisite actions retain separate scoped approval. Init does not ask about or perform push by
+default; an explicitly requested non-force push requires separate approval after local completion.
+It must not modify application code, create Breadcrumb issues or pull requests, or create
+implementation branches.
 
 GitHub issue lifecycle operations:
 
@@ -1544,57 +1626,73 @@ Input and source:
 Purpose:
 
 - Initialize repository-specific Breadcrumb configuration.
-- Diagnose whether the repository and active GitHub identity can support the full Breadcrumb workflow.
-- Explain how to resolve missing runtime, Git, or GitHub prerequisites without changing them automatically.
+- Diagnose whether the selected local initialization plan can be completed now.
+- Explain how to resolve required runtime, Git, or GitHub prerequisites while deferring capabilities
+  owned by future work.
 - Define how implementations in this repository must be verified.
 - Create or refine `.breadcrumb/config.json` and `.breadcrumb/verification.md` with the user.
 
 Behavior:
 
-- Run bootstrap checks before invoking Python, then run the remaining initialization preflight and classify each capability as `ready`, `blocked`, or `unverified`.
-- Resolve the target GitHub repository before writing Breadcrumb configuration.
-- Report exact remediation or manual verification steps for every `blocked` or `unverified` capability.
-- Offer each supported remediation separately, apply it only after explicit approval, and rerun the affected checks.
-- Inspect existing repository verification mechanisms before asking questions.
-- Cite repository evidence for each proposed verification instruction.
-- Review proposed verification instructions with the user one item at a time using `accept`, `modify`, or `exclude` decisions.
-- Ask one question at a time for missing, conflicting, or ambiguous project-specific requirements.
-- Run a command to validate a proposed instruction only after separate approval for that exact command.
-- Create or update `.breadcrumb/config.json` and `.breadcrumb/verification.md` only after user approval.
-- When no commit exists, ensure the unborn branch is the configured default branch, offering that
-  exact branch-name setup as a separate approval when needed. Show the exact proposed initial-commit
-  scope and obtain approval for that setup commit separately. Then show the exact configuration-file
-  diff, stage no other paths, and create a scoped configuration commit. For a nonempty remote,
-  require an up-to-date local default branch; for a reachable empty remote, allow only the initial
-  commit approved in this init run as its base. Stop on overlapping or unapproved changes rather
-  than stashing or absorbing them.
-- Offer the exact non-force push of that commit as a separate HITL action. Do not bypass branch
-  protection. If repository policy requires a pull request, or the push is declined, report local
-  setup as complete but the full cross-session workflow as blocked until the user publishes the
-  configuration through the repository's normal process.
-- When the file already exists, compare it with the current codebase, preserve confirmed instructions, and apply only approved additions, removals, or corrections.
+- Run safe runtime, repository, auth, GitHub GET, template, verification, worktree/index, tracking,
+  and ignore-provenance discovery before asking questions; safe reads and probes need no approval.
+- Ask one focused question only for unresolved repository identity, a new/conflicting storage mode,
+  or a genuine verification evidence conflict. Preserve proven tracked or local-only mode without
+  asking; recommend track when one storage choice is required.
+- Treat tracked-to-local-only transition as out of scope. Support local-only-to-track only with two
+  regular approved files, no staged/overlapping changes, preserved ignore rules, and exact force-add
+  of those two paths.
+- Classify selected-plan capabilities as `ready`, `blocked`, `unverified`, or `deferred`. Only
+  current-plan blockers and warnings affect `ready`, `ready with warnings`, or `blocked`; unused
+  push, force-update, PR, issue/comment, and implementation-branch capabilities are deferred.
+- Keep runtime installation, authentication/authority acquisition, repository/remote change,
+  enabling Issues, and other prerequisite actions under separate scoped approval.
+- Before a plan with a nonempty commit, require an attached configured default branch whose pre-plan
+  HEAD exactly matches the fetched nonempty remote default. For an empty local/remote pair, create
+  only one separately approved exact initial root baseline; other histories require reconciliation.
+  No-commit plans do not mutate merely to establish a baseline.
+- Gather all clear evidence-backed verification guidance without item-by-item approval. Ask only
+  about actual evidence conflicts; preserve supported existing entries.
+- Show one integrated plan containing exact label operations, complete verification and setup file
+  content/diffs, selected mode, write/stage/commit paths, commit message or no-commit, required
+  capability exceptions, deferred groups, and operation order. One approval covers those exact
+  label/file/validation/stage/commit actions; any revision rerenders the whole plan.
+- Immediately before mutation, recheck identity, labels, templates, authority, paths, worktree/index,
+  storage and approved bytes. Stop before writing on staged work, overlapping changes, or changed
+  approval basis; preserve unrelated unstaged/untracked work.
+- In track mode, stage only changed config and verification files, using exact force-add only for an
+  approved local-only transition. In local-only mode, never stage those files and stage only root
+  `.gitignore` when the two exact rules are newly needed. Require exact staged set/diff and create no
+  empty commit.
+- Stop subsequent plan operations on failure or uncertainty and separate success, failed/uncertain,
+  and unattempted work without speculative rollback.
+- Do not ask about push by default. When explicitly requested, finish local setup first, revalidate
+  the exact remote update, obtain separate approval, and push once without force. Report that
+  outcome separately from local readiness.
 
 Output:
 
-- Resolved Python interpreter path and version, plus `git` and `gh` availability.
-- Resolved Git repository root and GitHub repository.
-- Active GitHub identity and host used by `gh`, without exposing credentials.
-- Capability table with `ready`, `blocked`, or `unverified` results.
-- Setup or manual verification instructions for every non-ready result.
-- Approved setup actions performed and their recheck results.
-- Repository evidence used for the proposed verification policy.
-- Accepted, modified, and excluded verification items.
-- Result of creating, committing, and publishing `.breadcrumb/config.json` and `.breadcrumb/verification.md`, including manual publication work when required.
+- Local result `ready`, `ready with warnings`, or `blocked` for the selected plan.
+- Selected repository and storage mode; performed label, file, stage, and commit operations.
+- Actual blockers, relevant warnings, deferred capability groups, and partial/unattempted work.
+- Verification evidence and resulting complete guidance rather than per-item acceptance history.
+- Local-only scope or unpublished track commit as information, not warning.
+- Optional publication result separately when explicitly requested.
+- Full capability table only for diagnosis or on request.
 
 Side effects:
 
 - Create `.breadcrumb/` when needed.
 - Create or update `.breadcrumb/config.json` and `.breadcrumb/verification.md`.
-- Create one exact-scope initial commit only when separately approved for a repository with no commit.
-- Commit only the approved Breadcrumb configuration files when they changed.
-- Push the resulting configured default branch only after separate approval and only as a fast-forward.
-- Perform individually approved runtime, Git, or GitHub setup actions allowed by HITL Remediation.
+- Create, case-only rename, or correct metadata for the two exact Breadcrumb labels only as approved
+  in the integrated plan.
+- In track mode, commit only changed approved config and verification paths. In local-only mode,
+  leave those paths untracked/ignored and commit only an approved changed root `.gitignore`.
+- Create no empty integrated-plan commit and never include an existing staged or unrelated path; a
+  separately approved explicitly empty initial root baseline is the sole exception.
+- Perform separately approved prerequisite actions allowed by HITL Remediation.
 - Run an individually approved command used to validate a proposed verification instruction.
+- Push only after explicit request and separate approval, and only as a non-force update.
 - Do not modify application code.
 - Do not perform unapproved setup actions.
 - Do not weaken repository or organization security policy.
@@ -1746,8 +1844,17 @@ Gate:
 
 - `.breadcrumb/config.json` must identify the current remote and GitHub repository without conflict.
 - `.breadcrumb/verification.md` must exist. If it is missing, stop and recommend `breadcrumb-init`.
-- The fetched configured default-branch commit must contain matching committed copies of both files;
-  local-only initialization is not sufficient for a durable implementation branch.
+- If both are valid regular untracked files ignored by regular in-repository `.gitignore` files,
+  recognize local-only mode and stop before branch or code mutation. Recommend `breadcrumb-init`
+  local-only-to-track conversion, followed by publication through an explicitly requested init push
+  or the repository's normal pull-request process.
+- The fetched configured default-branch commit must contain non-symlink Git blobs byte-for-byte
+  matching the validated local copies of both files. Local-only or a clean tracked but unpublished
+  local setup is not sufficient for a durable implementation branch. Distinguish an unpublished
+  setup and provide the same explicit
+  push/normal-publication handoff before retrying.
+- Mixed tracking, external-only ignore, symlink, local modification, malformed config, and other
+  inconsistent setup states are not valid local-only and require normal init repair.
 - Design issue must have Phase `ready`.
 - Design issue must not have an unchecked Todo item.
 - Unrelated working-tree changes must not overlap branch switching, implementation, or the scoped
@@ -1981,11 +2088,17 @@ Repository configuration:
 
 ```text
 not initialized
--> runtime, Git, and GitHub preflight run by init
--> verification instructions created or updated by init
--> ready, ready with warnings, or blocked
+-> read-only runtime, Git, GitHub, template, storage, and verification discovery by init
+-> tracked or local-only mode selected from evidence or one user choice
+-> one integrated label/file/commit plan approved and executed
+-> local ready, ready with warnings, or blocked
+-> optional non-force publication only after explicit request and separate approval
 -> rerun init when verification requirements or repository access changes
 ```
+
+Local-only files and an unpublished tracked commit can be locally `ready` without being durable on
+the remote default branch. Before implementation, convert local-only to track when needed and
+publish the tracked setup through the explicit init push path or the repository's normal PR process.
 
 Requirement issue:
 
