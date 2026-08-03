@@ -61,13 +61,6 @@ judge those items.
 3. If the target is missing, inaccessible, a pull request, dual-labeled, unlabeled, or malformed,
    stop canonical analysis. Report the diagnostic and only a safe lifecycle or `breadcrumb-init`
    recovery path; do not invent Todo, classifications, or a successful proposal.
-4. Run `<python> <plugin-root>/scripts/get_breadcrumb_issue_progress.py --hostname
-   <github.hostname> --repository <github.owner>/<github.repository> <issue-number>` from the Git
-   root after the direct target gate. Require successful schema-version-1 JSON for the configured
-   repository, but use it only to discover type, Phase, strong issue relationships, implementation
-   branch, and pull request identifiers. If a related artifact makes projection incomplete, retain
-   the independently validated target and isolate only the affected relationship as uncertain.
-
 ## Build The Todo Ledger
 
 1. Read the complete human-readable target body and final state block before judging any item.
@@ -82,10 +75,30 @@ judge those items.
    be capable of changing its classification, missing-blocker status, options, recommendation,
    uncertainty, or lifecycle handoff. This is the evidence plan; do not collect unrelated context.
 
+## Discover Strong Artifacts When Needed
+
+1. Only when the evidence plan shows that relationship, implementation, or pull request state can
+   change an output decision or lifecycle handoff, run `<python>
+   <plugin-root>/scripts/get_breadcrumb_issue_progress.py --hostname <github.hostname>
+   --repository <github.owner>/<github.repository> <issue-number>` from the Git root.
+2. Require successful schema-version-1 JSON for the configured repository, but use it only to
+   discover type, Phase, strong issue relationships, implementation branch, and pull request
+   identifiers. If a related artifact makes projection incomplete, retain the independently
+   validated target and isolate only the affected relationship as uncertain.
+3. Treat projected branch and pull request identifiers as discovery pointers, not sufficient proof
+   by themselves. Before a pull request controls a Todo decision or lifecycle state, fetch it
+   directly and require its head branch to match the trusted implementation branch, its base branch
+   to match the configured default branch, and its first-block schema-1 `pr` footprint and final
+   `Closes #<design-number>` line to agree with the design and branch. Require the footprint
+   author's `author_association` to be `OWNER`, `MEMBER`, or `COLLABORATOR`; reject explicitly
+   read-only provenance when stronger permission metadata exists. A projected candidate supported
+   only by issue-closing prose is untrusted human context, not control state.
+
 ## Collect Minimal Relevant Evidence
 
-- Start with the validated target body, state, relationships, and progress result. Read another
-  artifact only when the evidence plan shows it can materially change at least one output decision.
+- Start with the validated target body and state, then any relationship or progress result justified
+  by the evidence plan. Read another artifact only when it can materially change at least one
+  output decision.
 - Follow requirement/design relationships only through validated state fields and progress
   projection. Do not infer relationships from titles, prose, branch names, or similar content.
 - When needed, fetch related issue bodies, fully paginated comments, pull request metadata/files,

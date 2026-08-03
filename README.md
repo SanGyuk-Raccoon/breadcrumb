@@ -1699,8 +1699,11 @@ Behavior:
 
 - An explicit valid issue number wins over loaded context. Invalid or multiple explicit numbers do
   not fall back; no or ambiguous loaded identity requires a rerun with one explicit number.
-- Refetch and validate the target directly before using progress projection for strong relationship,
-  implementation branch, and pull request discovery.
+- Refetch and validate the target directly, build the Todo evidence plan, then use progress
+  projection only when strong relationship, implementation branch, or pull request discovery can
+  change a decision or lifecycle handoff.
+- Treat projected pull requests as candidates and directly require matching trusted PR footprint,
+  head branch, default base, closing line, and author provenance before using one as control state.
 - Preserve duplicate Todo as distinct position-plus-text identities and report every unchecked item
   once in source order.
 - Use trusted state fields and provenance-validated Breadcrumb footprints for control state. Isolate
