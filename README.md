@@ -933,7 +933,9 @@ Breadcrumb uses two issue types.
 
 ### Requirement Issue
 
-Created by `breadcrumb-open` and updated in place by `breadcrumb-refine`.
+Created individually or as an approved ordered leaf set by `breadcrumb-open`, then updated in place
+by `breadcrumb-refine`. Recursive split nodes are conversation-only and never become tracking
+issues.
 
 Purpose:
 
@@ -1103,6 +1105,21 @@ Gate rules:
 - `breadcrumb-implement` must stop if a design issue has any unchecked Todo item.
 - Todo items are not split into blocking and non-blocking. Every unchecked item blocks the next phase.
 - Phase must be `draft` when an unchecked Todo item exists and `ready` when none exists.
+
+A split leaf may encode a real dependency with this canonical Todo form:
+
+```text
+- [ ] [Breadcrumb prerequisite: #123] 선행 요구사항이 Breadcrumb Phase ready에 도달했는지 확인한다.
+```
+
+The document parser still validates only task syntax and Phase/Todo consistency; it does not infer
+cross-issue readiness. `breadcrumb-refine` directly verifies the referenced issue before allowing
+this Todo to be completed or deleted, and preserves or restores it as unchecked when the referenced
+artifact is missing, malformed, or not `Phase: ready`. `breadcrumb-design` rechecks even completed
+prerequisite Todo before accepting the requirement as ready. The prerequisite must be a valid
+requirement issue in the same configured repository; its GitHub open/closed state does not change
+its Breadcrumb Phase. A prerequisite-looking Todo with a malformed marker is unsatisfied and cannot
+pass by being manually checked.
 
 ### Issue State Parsing
 
@@ -1453,6 +1470,9 @@ Rules:
 
 - Ask one question at a time.
 - After each answer, reconsider whether ambiguity remains.
+- `breadcrumb-open` re-evaluates one-pull-request scope initially and after scope-changing answers.
+  A split plan shows every leaf in stable dependency order and obtains one approval for the entire
+  exact bundle; any plan change invalidates that approval.
 - Do not make arbitrary product, design, or implementation decisions.
 - If a later phase finds earlier-phase ambiguity, report it and send the work back to the right phase.
 - The initial `breadcrumb-implement` branch choice is the only implementation-stage HITL. After that choice, the skill must not ask further questions.
@@ -1486,7 +1506,9 @@ breadcrumb-refine
 breadcrumb-design
 ```
 
-- `breadcrumb-open` may create a requirement issue.
+- `breadcrumb-open` may create one requirement issue or the final leaves of one explicitly approved
+  recursively split bundle. It creates each leaf once in dependency order and stops the remaining
+  writes on failure or uncertainty; it never creates intermediate tracking issues.
 - `breadcrumb-refine` edits one open requirement issue title/body in place with one approved PATCH. It never creates a replacement issue or refinement comment and never changes issue state or labels.
 - `breadcrumb-design` may create, edit, or close a design issue and may close or reopen its related requirement issue.
 - `breadcrumb-design` does not add standalone comments. Phase and design content are persisted by writing the design issue body.
@@ -1609,23 +1631,44 @@ Input and source:
 
 Purpose:
 
-- Turn a user request into a requirement issue.
+- Turn a user request into one cohesive requirement issue or a recursively split set of cohesive
+  requirement leaves.
 - Clarify intent before issue creation.
 - Save incomplete requirement work when requested.
 
 Behavior:
 
 - Do not create an issue immediately.
-- Analyze the request and identify ambiguity.
+- Evaluate whether the current scope is one independently implementable, verifiable, and reviewable
+  pull request. Re-evaluate after every scope-changing answer; do not use file or line-count
+  thresholds.
+- Analyze each one-pull-request leaf and identify ambiguity.
 - Ask one question at a time.
-- Continue until the user is satisfied or asks to save the current state.
-- If unfinished questions or work remain, write them as unchecked Todo items.
-- Create the issue only after user approval.
+- Recursively split scopes with independent outcomes or materially separate migration, operational,
+  or review boundaries. Create final leaves only, never intermediate tracking issues.
+- Render every leaf independently from `requirement.md`. Every split leaf is `draft` and contains at
+  least one concrete scope-specific unchecked Todo.
+- Keep independent leaves unrelated. Encode only real blockers as `[Breadcrumb prerequisite: #N]`
+  Todo and order the acyclic graph with a stable topological sort.
+- Before creation, show the repository, split reason, order, every exact title/body/label,
+  relationships, prerequisite, and symbolic `{{breadcrumb:issue:Rn}}` reference in one proposal.
+  Obtain one explicit approval for the complete exact bundle; a change requires reapproval.
+- Immediately before the first write, revalidate repository capability, label, template, every
+  symbolic body, token, and graph. If re-rendering changes the approved result, create nothing and
+  request approval for the new complete bundle.
+- Replace only approved backward tokens with issue numbers returned by earlier successful POSTs.
+  Validate that each final body differs only by those substitutions, then POST that leaf exactly
+  once. Use its number for later tokens only after the response or one direct GET confirms the
+  configured repository, exact title/body, and exact requirement label.
+- Stop on the first clear failure or uncertain response without retrying or rolling back. Report
+  created, failed, uncertain, and unattempted leaves separately, include confirmed URLs and
+  processing order, and direct the user to invoke `breadcrumb-load` explicitly for each issue.
+- Preserve the original single-issue flow when no split is needed.
 
 Side effects:
 
-- Create requirement issue.
-- Add label `breadcrumb:requirement`.
+- Create one requirement issue or an approved ordered set of final requirement leaves.
+- Add only `breadcrumb:requirement` to every created issue.
 
 ### breadcrumb-review
 
@@ -1673,6 +1716,11 @@ Behavior:
 - Identify what to keep, remove, and change.
 - Ask one question at a time.
 - If unfinished questions or work remain, write them as unchecked Todo items.
+- Recognize only the complete canonical `[Breadcrumb prerequisite: #N] 선행 요구사항이 Breadcrumb
+  Phase ready에 도달했는지 확인한다.` Todo and directly validate the referenced requirement. Allow
+  completion or deletion only while it is valid and `Phase: ready`; otherwise preserve or restore
+  the Todo as unchecked and keep the target `draft`. A prerequisite-looking noncanonical line is
+  also unsatisfied.
 - Stop if an open design still relates to the requirement.
 - Preserve unrelated body content and migrate schema-1 requirements to schema 2.
 - On approval, update only the existing issue title and body with one PATCH.
@@ -1698,7 +1746,14 @@ Purpose:
 Gate:
 
 - If the requirement issue has any unchecked Todo item, stop and report it.
-- Recommend `breadcrumb-refine`.
+- Revalidate every completed canonical `[Breadcrumb prerequisite: #N] 선행 요구사항이 Breadcrumb
+  Phase ready에 도달했는지 확인한다.` Todo against the referenced requirement. A checked box does
+  not pass the gate unless the referenced issue is a valid requirement with `Phase: ready`; GitHub
+  open/closed state is irrelevant. A prerequisite-looking noncanonical line fails the gate.
+- If that semantic gate fails and no open related design exists, stop and recommend
+  `breadcrumb-refine`. If one open related design exists, use the existing recovery flow: record the
+  defect in the design, close it, reopen the requirement, then recommend `breadcrumb-refine`.
+- For ordinary unchecked Todo, report the blockers and recommend `breadcrumb-refine`.
 
 Default creation policy:
 
@@ -1938,6 +1993,12 @@ Strong identity checks include:
 
 Do not use title similarity, body similarity, content hashes, a global operation ID, or full timeline replay to infer that two operations are the same. Timeline events may be inspected as diagnostic evidence when current state is insufficient, but they are not a general execution log that Breadcrumb replays.
 
+Within one approved `breadcrumb-open` split publication, a successful POST response's positive issue
+number and URL are the only identities used to resolve later symbolic references. A leaf POST is
+never retried after a clear failure or uncertain response, and later leaves are not attempted.
+Breadcrumb stores no split-plan ledger or symbol in the created issues, so a later session must not
+reconstruct or automatically resume the remaining plan through title/body similarity.
+
 Mutation policy:
 
 - Combine fields such as an issue body and labels into one GitHub request when the API supports it.
@@ -1952,7 +2013,7 @@ On partial failure, report:
 - The failed or uncertain step and available error evidence.
 - Remaining steps that were not attempted.
 
-Recovery is driven by a later explicit user request. The user may ask Breadcrumb to inspect the current artifacts and finish the remaining steps, start the workflow again, or leave the partial state unchanged. A recovery invocation reuses an unambiguous existing artifact when requested, but Breadcrumb does not maintain a separate recovery ledger or guarantee automatic reconstruction of every interrupted operation.
+Recovery is driven by a later explicit user request. The user may ask Breadcrumb to inspect the current artifacts and finish the remaining steps, start the workflow again, or leave the partial state unchanged. A recovery invocation reuses an unambiguous existing artifact when requested, but Breadcrumb does not maintain a separate recovery ledger or guarantee automatic reconstruction of every interrupted operation. The general finish-remaining-steps option does not apply to a partially published `breadcrumb-open` split bundle: it cannot be automatically resumed or replayed. Any later publication requires a new complete approval that treats confirmed created leaves as existing artifacts and does not recreate them.
 
 ## Workflow Artifacts
 
@@ -1960,7 +2021,7 @@ Breadcrumb progress is represented by the presence of durable artifacts rather t
 
 ```text
 requirement
--> Requirement Issue
+-> one Requirement Issue or approved final leaf issues
 
 design
 -> Design Issue
@@ -1990,7 +2051,7 @@ not initialized
 Requirement issue:
 
 ```text
-created by open
+created singly or as final split leaves by open
 -> draft or ready
 -> edited in place by refine and written as requirement document schema 2
 -> closed when a ready design issue is created
