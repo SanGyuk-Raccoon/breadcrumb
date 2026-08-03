@@ -36,6 +36,7 @@ Initial skill set:
 breadcrumb-init
 breadcrumb-open
 breadcrumb-review
+breadcrumb-suggest
 breadcrumb-refine
 breadcrumb-design
 breadcrumb-implement
@@ -1416,6 +1417,19 @@ These skills must rely on GitHub issues, codebase state, branch state, commits, 
 
 `breadcrumb-load` reads existing GitHub context as-is and does not ask questions.
 
+### Conversation Context Limited To Target Identity
+
+```text
+breadcrumb-suggest
+```
+
+`breadcrumb-suggest` may use the current invocation's explicit issue number or one distinct exact
+repository and issue identity produced by successful `breadcrumb-load` executions; repeated
+identical identities are one candidate, while any different or repository-conflicting identity
+requires an explicit number. It may also honor the requested presentation level. After resolving
+that pointer, it refetches the latest GitHub issue and never uses conversation summaries, pasted
+output, or previously loaded body, Phase, or Todo as durable facts.
+
 `breadcrumb-implement` may use one explicit user choice during its initial branch-resolution step when the intended branch already exists. This choice is control input for selecting `continue` or `start over`; it is not a source for product, design, or implementation judgment. The skill asks once only when the invocation did not already supply the choice. After branch resolution, conversation context is forbidden and the skill must rely only on GitHub issues and repository state.
 
 ## HITL Policy
@@ -1447,6 +1461,7 @@ No HITL:
 breadcrumb-load
 breadcrumb-pr
 breadcrumb-list
+breadcrumb-suggest
 ```
 
 Rules:
@@ -1509,6 +1524,7 @@ Read-only:
 breadcrumb-review
 breadcrumb-list
 breadcrumb-load
+breadcrumb-suggest
 ```
 
 `breadcrumb-implement` may:
@@ -1653,6 +1669,54 @@ Output:
 - Session-only review report.
 - The user decides whether the report should lead to `breadcrumb-refine`, `breadcrumb-design`, or no further action.
 - `breadcrumb-review` does not automatically persist or apply its findings.
+
+### breadcrumb-suggest
+
+Input and source:
+
+- One explicit positive requirement or design issue number, or one exact same-repository target
+  identity produced by a successful `breadcrumb-load` in the current conversation.
+- The refetched latest target issue and its validated final state block.
+- Only related durable artifacts, repository files, and read-only Git evidence that can change a
+  Todo decision, missing blocker, option, recommendation, uncertainty, or lifecycle handoff.
+
+Purpose:
+
+- Classify every canonical unchecked Todo exactly once as `유지`, `재작성 필요`, or `불필요`.
+- Compare meaningful resolution options and their advantages, disadvantages, risks, prerequisites,
+  and evidence-based recommendation.
+- Identify only missing Todo candidates that block entry to the next Breadcrumb phase.
+- Propose a session-only final Todo set and the valid lifecycle handoff without applying either.
+
+Boundary with adjacent read skills:
+
+- `breadcrumb-load` reconstructs durable context without changing its meaning.
+- `breadcrumb-review` reports broad quality, correctness, risk, and verification findings.
+- `breadcrumb-suggest` uses the full relevant context only to decide how existing Todo should be
+  kept, rewritten, completed, or removed and whether a next-phase blocker is missing.
+
+Behavior:
+
+- An explicit valid issue number wins over loaded context. Invalid or multiple explicit numbers do
+  not fall back; no or ambiguous loaded identity requires a rerun with one explicit number.
+- Refetch and validate the target directly before using progress projection for strong relationship,
+  implementation branch, and pull request discovery.
+- Preserve duplicate Todo as distinct position-plus-text identities and report every unchecked item
+  once in source order.
+- Use trusted state fields and provenance-validated Breadcrumb footprints for control state. Isolate
+  failures in related artifacts to only the affected decision.
+- Ask no questions, run no project code, tests, or builds, mutate no local or external state, and
+  never invoke the proposed next skill automatically.
+
+Output:
+
+- Target and read-only notice, evidence ledger, ordered Todo classifications, meaningful option
+  comparisons, missing blocker candidates or explicit none, proposed final Todo, isolated
+  uncertainties, and lifecycle-aware next step.
+
+Side effects:
+
+- None.
 
 ### breadcrumb-refine
 
