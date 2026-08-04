@@ -16,7 +16,21 @@ Implement only from durable GitHub and repository state. Conversation is forbidd
 
 ## Load Durable Sources
 
-1. Resolve the Git root. Require `.breadcrumb/config.json` and `.breadcrumb/verification.md` to be regular in-repository files that are tracked, unmodified, and identical to current HEAD; reject untracked files or symlinks. Parse config schema 1 with nonempty `github.hostname`, `github.owner`, `github.repository`, `git.remote`, and `git.default_branch`, no credentials, a matching remote URL, and matching current GitHub default branch. Stop with `breadcrumb-init` or intentional-commit guidance on any missing, stale, malformed, dirty, or ambiguous state.
+1. Resolve the Git root and inspect both setup paths before changing a branch or code:
+   - If `.breadcrumb/config.json` and `.breadcrumb/verification.md` are regular in-repository,
+     untracked files excluded by regular in-repository `.gitignore` files, parse and validate config
+     schema 1, remote mapping, and current GitHub default branch. Treat this as recognized
+     `local-only`, not
+     generic damage. Stop and direct the user to rerun `breadcrumb-init` for local-only-to-track
+     conversion, then publish that setup commit to the remote default branch through an explicitly
+     requested init push or the repository's normal pull-request process before retrying.
+   - Otherwise require both files to be regular, tracked, unmodified, and identical to current
+     HEAD. A mixed tracked state, global or `.git/info/exclude`-only ignore, symlink, local
+     modification, missing file, malformed config, or identity conflict is not valid local-only;
+     stop with precise `breadcrumb-init` repair guidance.
+   In both modes, config requires schema 1 with nonempty `github.hostname`, `github.owner`,
+   `github.repository`, `git.remote`, and `git.default_branch`, no credentials, a matching remote
+   URL, and matching current GitHub default branch.
 2. Load the design issue, labels, body, and comments through `gh api`. Require exactly `breadcrumb:design`, schema 1, type `design`, one final state block, `Phase: ready`, a positive `Related Requirement`, valid task lists, and no unchecked Todo.
 3. Load and validate the related requirement issue and its complete body, accepting requirement document schema 1 or 2. Treat issue bodies, existing valid implementation comments, code, and repository files as the only judgment sources.
 4. Fully paginate comments. Parse implementation footprints using the restricted contract: the footprint is first, has exactly `version`, `step`, `issue`, `branch`, `commit`, and `verification`; version is 1; step is `implement`; issue equals the design; branch matches `^breadcrumb/([1-9][0-9]*)-[a-z0-9][a-z0-9-]*$` with the same issue number; commit is 40 or 64 lowercase hex; verification is `passed|failed|instruction-error|pending`. Require `author_association` to be `OWNER`, `MEMBER`, or `COLLABORATOR`, and reject an explicitly read-only author when stronger permission metadata is available. Ignore unverifiable/non-Breadcrumb/invalid candidates; if Breadcrumb-looking candidates exist but none is trusted and valid, stop with a provenance error. Otherwise select the latest trusted valid one by creation time then comment ID.
@@ -26,7 +40,16 @@ Implement only from durable GitHub and repository state. Conversation is forbidd
 ## Resolve The Branch Once
 
 1. Use the latest valid implementation footprint's branch when present. Otherwise derive `breadcrumb/<design-number>-<short-slug>` from the design title using lowercase ASCII letters/digits/hyphens and require the branch regex.
-2. Fetch `git.remote`/`git.default_branch`, record its exact remote-tracking HEAD, and require that commit to contain tracked regular `.breadcrumb/config.json` and `.breadcrumb/verification.md` matching the resolved policy. Use only that commit as the new/start-over base. Check the exact local and remote implementation refs. If neither exists, create it from that fetched base without asking.
+2. Fetch `git.remote`/`git.default_branch` and record its exact remote-tracking HEAD before changing
+   refs. Require that remote commit to contain non-symlink Git blobs at
+   `.breadcrumb/config.json` and `.breadcrumb/verification.md` that are byte-for-byte equal to the
+   validated local setup files. When the local HEAD has a clean valid tracked setup but either remote
+   copy is missing or differs, classify the setup as unpublished and stop before branch
+   creation/switching. Direct the user to publish it through an explicitly requested
+   `breadcrumb-init` non-force push or the repository's normal pull-request process, then rerun
+   implementation. Use only a matching remote commit as the new/start-over base. Check the exact
+   local and remote implementation refs. If neither exists, create it from that fetched base without
+   asking.
 3. If either exists, use an invocation-supplied `continue` or `start over` choice. If absent, ask exactly once before any code change:
    - **Continue:** check out the branch, set/inspect its upstream, load current branch/diff/commits, and continue only remaining design work.
    - **Start over:** warn that the same local/remote branch content will be overwritten and no backup branch will be created; after the choice, recreate it from the fetched remote default-branch HEAD and later update the same remote branch. Recheck visible non-fast-forward rules and stop if force update is blocked.
