@@ -8,7 +8,7 @@ from support import copied_fixture
 
 from internal.errors import BreadcrumbOperationalError
 from internal.github import GitHubClient, parse_target
-from internal.listing import DESIGN_LABEL, REQUIREMENT_LABEL, list_issue_numbers
+from internal.listing import BACKLOG_LABEL, DESIGN_LABEL, REQUIREMENT_LABEL, list_issue_numbers
 
 
 class PagingRunner:
@@ -62,23 +62,27 @@ class FakeListingClient:
 
 class ListingTests(unittest.TestCase):
     def test_filters_prs_and_reports_conflicting_labels(self) -> None:
+        backlog = copied_fixture("backlog_issue.json")
         requirement = copied_fixture("requirement_issue.json")
         design = copied_fixture("design_issue.json")
         conflict = copied_fixture("requirement_issue.json")
         conflict["number"] = 40
-        conflict["labels"].append({"name": DESIGN_LABEL})
+        conflict["labels"].append({"name": BACKLOG_LABEL})
         pull = copied_fixture("requirement_issue.json")
         pull["number"] = 50
         pull["pull_request"] = {"url": "example"}
         client = FakeListingClient(
             {
+                BACKLOG_LABEL: [backlog, conflict],
                 REQUIREMENT_LABEL: [requirement, conflict, pull],
-                DESIGN_LABEL: [design, conflict],
+                DESIGN_LABEL: [design],
             }
         )
         result = list_issue_numbers(client, "all")
         self.assertEqual(result["hostname"], "ghe.example.test")
         self.assertEqual(result["repository"], "acme/widgets")
+        self.assertEqual(client.calls, [BACKLOG_LABEL, REQUIREMENT_LABEL, DESIGN_LABEL])
+        self.assertEqual(result["backlogs"], [8])
         self.assertEqual(result["requirements"], [12])
         self.assertEqual(result["designs"], [21])
         self.assertEqual(
@@ -86,7 +90,10 @@ class ListingTests(unittest.TestCase):
             [{
                 "number": 40,
                 "code": "conflicting_type_labels",
-                "message": "issue has both breadcrumb:requirement and breadcrumb:design labels",
+                "message": (
+                    "issue has multiple Breadcrumb type labels: "
+                    "breadcrumb:backlog, breadcrumb:requirement"
+                ),
             }],
         )
 
@@ -95,7 +102,18 @@ class ListingTests(unittest.TestCase):
         client = FakeListingClient({REQUIREMENT_LABEL: [requirement]})
         result = list_issue_numbers(client, "requirement")
         self.assertEqual(client.calls, [REQUIREMENT_LABEL])
+        self.assertEqual(result["backlogs"], [])
         self.assertEqual(result["requirements"], [12])
+        self.assertEqual(result["designs"], [])
+
+    def test_backlog_filter_queries_only_backlog_label(self) -> None:
+        backlog = copied_fixture("backlog_issue.json")
+        backlog["state"] = "closed"
+        client = FakeListingClient({BACKLOG_LABEL: [backlog]})
+        result = list_issue_numbers(client, "backlog")
+        self.assertEqual(client.calls, [BACKLOG_LABEL])
+        self.assertEqual(result["backlogs"], [8])
+        self.assertEqual(result["requirements"], [])
         self.assertEqual(result["designs"], [])
 
 

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Iterable
 
 from . import (
+    CURRENT_BACKLOG_DOCUMENT_SCHEMA_VERSION,
     CURRENT_DESIGN_DOCUMENT_SCHEMA_VERSION,
     CURRENT_REQUIREMENT_DOCUMENT_SCHEMA_VERSION,
     SCRIPT_OUTPUT_SCHEMA_VERSION,
@@ -24,6 +25,7 @@ from .footprints import (
 
 
 TEMPLATE_TYPES = (
+    "backlog",
     "requirement",
     "design",
     "comment-implementation",
@@ -126,7 +128,17 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
     block_indices = range(scope_start, scope_end)
     todo = [index for index in block_indices if lines[index] == TODO_HEADING]
     status = [index for index in block_indices if lines[index] == STATUS_HEADING]
-    if len(todo) != 1:
+    if template == "backlog":
+        if todo:
+            errors.append(
+                _error(
+                    template,
+                    "missing_heading",
+                    "Backlog template must not contain a Todo heading",
+                    todo[0] + 1,
+                )
+            )
+    elif len(todo) != 1:
         message = "Todo heading is missing" if not todo else "Todo heading appears more than once"
         errors.append(
             _error(template, "missing_heading", message, None if not todo else todo[1] + 1)
@@ -145,9 +157,13 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
                 None if not status else status[1] + 1,
             )
         )
-    if len(todo) != 1 or len(status) != 1:
+    if (
+        len(status) != 1
+        or (template == "backlog" and bool(todo))
+        or (template != "backlog" and len(todo) != 1)
+    ):
         return errors
-    if todo[0] >= status[0]:
+    if template != "backlog" and todo[0] >= status[0]:
         errors.append(
             _error(
                 template,
@@ -157,6 +173,20 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
             )
         )
         return errors
+    if template == "backlog":
+        unexpected = next(
+            (index for index in range(scope_start, status[0]) if lines[index].strip()),
+            None,
+        )
+        if unexpected is not None:
+            errors.append(
+                _error(
+                    template,
+                    "missing_heading",
+                    "Backlog state may contain only Breadcrumb Status",
+                    unexpected + 1,
+                )
+            )
 
     fields: dict[str, list[tuple[str, int]]] = {}
     field_order: list[str] = []
@@ -178,12 +208,11 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
         fields.setdefault(name, []).append((value, index + 1))
         field_order.append(name)
 
-    required = [
-        "Schema Version",
-        "Type",
-        "Phase",
-        "Last Breadcrumb Step",
-    ]
+    required = (
+        ["Schema Version", "Type", "Last Breadcrumb Step"]
+        if template == "backlog"
+        else ["Schema Version", "Type", "Phase", "Last Breadcrumb Step"]
+    )
     if template == "design":
         required.insert(3, "Related Requirement")
         required.insert(4, "Refined From")
@@ -247,11 +276,11 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
             )
         )
     version_values = fields.get("Schema Version", [])
-    expected_version = (
-        CURRENT_REQUIREMENT_DOCUMENT_SCHEMA_VERSION
-        if template == "requirement"
-        else CURRENT_DESIGN_DOCUMENT_SCHEMA_VERSION
-    )
+    expected_version = {
+        "backlog": CURRENT_BACKLOG_DOCUMENT_SCHEMA_VERSION,
+        "requirement": CURRENT_REQUIREMENT_DOCUMENT_SCHEMA_VERSION,
+        "design": CURRENT_DESIGN_DOCUMENT_SCHEMA_VERSION,
+    }[template]
     if len(version_values) == 1 and version_values[0][0] != str(expected_version):
         errors.append(
             _error(
@@ -291,11 +320,11 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
                 )
             )
     last_values = fields.get("Last Breadcrumb Step", [])
-    allowed_last = (
-        {"open", "refine", "<open-or-refine>"}
-        if template == "requirement"
-        else {"design"}
-    )
+    allowed_last = {
+        "backlog": {"backlog"},
+        "requirement": {"open", "refine", "<open-or-refine>"},
+        "design": {"design"},
+    }[template]
     if len(last_values) == 1 and last_values[0][0] not in allowed_last:
         errors.append(
             _error(
@@ -323,7 +352,7 @@ def _validate_state_template(template: str, text: str) -> list[ValidationError]:
 
 
 def validate_template(template: str, text: str) -> list[ValidationError]:
-    if template in {"requirement", "design"}:
+    if template in {"backlog", "requirement", "design"}:
         return _validate_state_template(template, text)
 
     if template == "comment-implementation":

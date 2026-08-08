@@ -62,6 +62,7 @@ class ProgressProjectionTests(unittest.TestCase):
         self.assertEqual(result["hostname"], "ghe.example.test")
         self.assertEqual(result["repository"], "acme/widgets")
         self.assertEqual(result["errors"], [])
+        self.assertEqual(result["backlogs"], [])
         self.assertEqual(len(result["requirements"]), 1)
         self.assertEqual(len(result["designs"]), 1)
         requirement_projection = result["requirements"][0]
@@ -84,6 +85,39 @@ class ProgressProjectionTests(unittest.TestCase):
         )
         self.assertEqual(client.comment_calls, [21])
         self.assertEqual(client.pull_calls, ["breadcrumb/21-login-rate-limit"])
+
+    def test_backlog_projection_is_minimal_and_fetches_no_artifacts(self) -> None:
+        backlog = copied_fixture("backlog_issue.json")
+        client = FakeProgressClient([backlog])
+        result = get_issue_progress(client, [8])
+        self.assertEqual(result["backlogs"], [{
+            "number": 8,
+            "title": "Consider saved search filters",
+            "type": "backlog",
+            "state": "open",
+        }])
+        self.assertEqual(result["requirements"], [])
+        self.assertEqual(result["designs"], [])
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(client.label_calls, [])
+        self.assertEqual(client.comment_calls, [])
+        self.assertEqual(client.pull_calls, [])
+
+    def test_malformed_backlog_is_isolated_from_valid_requirement(self) -> None:
+        backlog = copied_fixture("backlog_issue.json")
+        backlog["body"] = backlog["body"].replace(
+            "- Last Breadcrumb Step: backlog", "- Last Breadcrumb Step: open"
+        )
+        requirement = copied_fixture("requirement_issue.json")
+        client = FakeProgressClient([backlog, requirement], design_candidates=[])
+        result = get_issue_progress(client, [8, 12])
+        self.assertEqual(result["backlogs"], [])
+        self.assertEqual(len(result["requirements"]), 1)
+        self.assertEqual(result["errors"], [{
+            "number": 8,
+            "code": "invalid_last_step",
+            "message": "Last Breadcrumb Step is invalid for backlog",
+        }])
 
     def test_multiple_open_related_designs_are_an_issue_error(self) -> None:
         requirement = copied_fixture("requirement_issue.json")
