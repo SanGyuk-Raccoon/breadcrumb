@@ -10,7 +10,8 @@ The core idea is that chat context is temporary, but GitHub issues can act as du
 - Codex chat is a temporary working space.
 - Breadcrumb skills move work from one explicit state to the next.
 - Important decisions from chat must be written back to GitHub issues.
-- Comments created by Breadcrumb include a machine-readable footprint and a human-readable heading.
+- Breadcrumb lifecycle comments include a machine-readable footprint and a human-readable heading.
+  Ordinary supplemental comments created by `breadcrumb-report` do not use Breadcrumb metadata.
 
 ## Plugin Shape
 
@@ -35,6 +36,7 @@ Initial skill set:
 ```text
 breadcrumb-init
 breadcrumb-open
+breadcrumb-report
 breadcrumb-review
 breadcrumb-suggest
 breadcrumb-refine
@@ -1486,6 +1488,7 @@ Source means the information a skill may use as judgment basis.
 ```text
 breadcrumb-init
 breadcrumb-open
+breadcrumb-report
 breadcrumb-review
 breadcrumb-refine
 breadcrumb-design
@@ -1494,6 +1497,10 @@ breadcrumb-design
 Notes:
 
 - `breadcrumb-design` may use conversation only for design-stage HITL. Final design decisions must be written into the design issue.
+- `breadcrumb-report` uses only user-authored messages from the current conversation as its primary
+  report source. It excludes previous sessions, remembered summaries, and system or developer
+  messages; assistant, error, and tool output may contribute only minimal sanitized context that is
+  materially useful for understanding or reproduction.
 
 ### Conversation Context Forbidden
 
@@ -1531,6 +1538,7 @@ Actively uses HITL:
 ```text
 breadcrumb-init
 breadcrumb-open
+breadcrumb-report
 breadcrumb-refine
 breadcrumb-design
 ```
@@ -1599,6 +1607,7 @@ GitHub issue lifecycle operations:
 
 ```text
 breadcrumb-open
+breadcrumb-report
 breadcrumb-refine
 breadcrumb-design
 ```
@@ -1606,6 +1615,9 @@ breadcrumb-design
 - `breadcrumb-open` may create one requirement issue or the final leaves of one explicitly approved
   recursively split bundle. It creates each leaf once in dependency order and stops the remaining
   writes on failure or uncertainty; it never creates intermediate tracking issues.
+- `breadcrumb-report` may create one ordinary bug or feature-request issue in the fixed
+  `SanGyuk-Raccoon/breadcrumb` repository after an open-and-closed duplicate search and exact
+  approval. It does not create a Breadcrumb requirement or begin the lifecycle.
 - `breadcrumb-refine` edits one open requirement issue title/body in place with one approved PATCH. It never creates a replacement issue or refinement comment and never changes issue state or labels.
 - `breadcrumb-design` may create, edit, or close a design issue and may close or reopen its related requirement issue.
 - `breadcrumb-design` does not add standalone comments. Phase and design content are persisted by writing the design issue body.
@@ -1614,7 +1626,13 @@ GitHub issue comment creation:
 
 ```text
 breadcrumb-implement
+breadcrumb-report
 ```
+
+- `breadcrumb-implement` creates a durable implementation comment with a Breadcrumb footprint on a
+  design issue.
+- `breadcrumb-report` may create one ordinary, metadata-free delta comment on an existing upstream
+  feedback issue after duplicate comparison and exact approval.
 
 Pull request creation:
 
@@ -1783,6 +1801,60 @@ Side effects:
 
 - Create one requirement issue or an approved ordered set of final requirement leaves.
 - Add only `breadcrumb:requirement` to every created issue.
+
+### breadcrumb-report
+
+Input and source:
+
+- The user's explicit `버그 제보` or `기능 제안` choice, requested as the first user-facing action.
+- User-authored messages from the current conversation.
+- Only minimal sanitized assistant, error, or tool context that materially helps understanding or
+  reproduction.
+- Current open and closed issues in `github.com/SanGyuk-Raccoon/breadcrumb`, plus repository,
+  identity, permission, and label metadata needed for the proposed write.
+
+Purpose:
+
+- Turn the current conversation into a privacy-minimized ordinary bug report or feature request for
+  Breadcrumb.
+- Avoid duplicate feedback and preserve useful incremental context on an existing issue.
+- Keep upstream feedback separate from Breadcrumb requirement and design lifecycle artifacts.
+
+Behavior:
+
+- Before any analysis or GitHub read, ask only whether the user is reporting a bug or suggesting a
+  feature, even when the invocation appears to imply the answer.
+- Build only from allowed current-conversation evidence, redact sensitive or unnecessary context,
+  and never invent missing facts.
+- Fully paginate open and closed issues, exclude pull requests, combine a compact index with
+  sanitized title- and behavior-oriented search, and direct-read only plausible candidates.
+- Skip a confidently identical issue with its link and state. For the same core with useful new
+  evidence, propose only a delta comment. Create a new issue only for a distinct result.
+- Resolve competing or uncertain candidates one question at a time. Incomplete pagination, search,
+  or candidate reads block every write.
+- Apply `bug` or `enhancement` only when both `permissions.push: true` and the exact label are
+  proven; otherwise omit the `labels` request field and preserve type in the canonical body.
+- Show the exact target and payload and obtain explicit approval. Revalidate identity, repository,
+  duplicates, permission, label, and candidate basis after approval; any material change requires a
+  new complete proposal and approval.
+- Perform exactly one issue POST or one comment POST, validate its strong identifier and exact
+  content with at most one direct identifier GET, and never retry, roll back, or perform a repair
+  mutation.
+
+Side effects:
+
+- Create at most one ordinary issue in `SanGyuk-Raccoon/breadcrumb`, optionally with exactly one
+  proven `bug` or `enhancement` label.
+- Or create at most one ordinary supplemental comment on one unlocked open or closed issue in that
+  repository.
+- Never create both in one invocation, and never create or mutate Breadcrumb lifecycle artifacts.
+
+Boundary with `breadcrumb-open`:
+
+- `breadcrumb-report` submits user feedback to the fixed upstream repository without starting the
+  Breadcrumb workflow.
+- `breadcrumb-open` creates durable requirement artifacts in the currently configured repository
+  and is the entry point for work intended to proceed through refinement, design, and implementation.
 
 ### breadcrumb-review
 
