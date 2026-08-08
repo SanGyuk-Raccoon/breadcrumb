@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""List compact Breadcrumb requirement and design issue-number sets."""
+"""List compact Breadcrumb backlog, requirement, and design issue-number sets."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repository", required=True, help="repository in owner/name form")
     parser.add_argument(
         "--type",
-        choices=("all", "requirement", "design"),
+        choices=("all", "backlog", "requirement", "design"),
         default="all",
         dest="type_filter",
     )

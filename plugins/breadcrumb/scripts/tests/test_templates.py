@@ -25,7 +25,7 @@ class TemplateValidationTests(unittest.TestCase):
                 plugin_root=PLUGIN_ROOT,
             )
         self.assertTrue(result["valid"])
-        self.assertEqual(len(result["templates"]), 4)
+        self.assertEqual(len(result["templates"]), 5)
         self.assertTrue(all(item["source"] == "plugin" for item in result["templates"]))
 
     def test_repository_override_is_selected_independently(self) -> None:
@@ -67,6 +67,20 @@ class TemplateValidationTests(unittest.TestCase):
             )
             result = validate_active_templates(
                 ("requirement",), repository_root=root, plugin_root=PLUGIN_ROOT
+            )
+        self.assertFalse(result["valid"])
+        self.assertEqual(result["errors"][0]["code"], "template_unreadable")
+
+    def test_backlog_override_symlink_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            override = root / ".breadcrumb" / "templates"
+            override.mkdir(parents=True)
+            override.joinpath("backlog.md").symlink_to(
+                PLUGIN_ROOT / "templates" / "backlog.md"
+            )
+            result = validate_active_templates(
+                ("backlog",), repository_root=root, plugin_root=PLUGIN_ROOT
             )
         self.assertFalse(result["valid"])
         self.assertEqual(result["errors"][0]["code"], "template_unreadable")
@@ -150,6 +164,23 @@ class TemplateValidationTests(unittest.TestCase):
         for variant in variants:
             with self.subTest():
                 self.assertTrue(validate_template("requirement", variant))
+
+    def test_backlog_template_rejects_todo_phase_and_invalid_step(self) -> None:
+        backlog = (PLUGIN_ROOT / "templates" / "backlog.md").read_text(encoding="utf-8")
+        variants = (
+            backlog.replace("## Breadcrumb Status", "## Todo\n\n## Breadcrumb Status"),
+            backlog.replace("- Type: backlog", "- Type: backlog\n- Phase: ready"),
+            backlog.replace("- Type: backlog", "- Type: requirement"),
+            backlog.replace("- Last Breadcrumb Step: backlog", "- Last Breadcrumb Step: open"),
+            backlog.replace(
+                "<!-- breadcrumb:state:start -->",
+                "<!-- breadcrumb:state:start -->\n<!-- breadcrumb:state:start -->",
+            ),
+            backlog + "\ntrailing",
+        )
+        for variant in variants:
+            with self.subTest():
+                self.assertTrue(validate_template("backlog", variant))
 
 
 if __name__ == "__main__":

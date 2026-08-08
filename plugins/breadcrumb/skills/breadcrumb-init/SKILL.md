@@ -83,7 +83,7 @@ Perform all applicable discovery before asking product or setup questions.
 ### GitHub And Verification Evidence
 
 1. Use explicit GET requests for repository metadata, Issues availability, visible permissions,
-   both exact Breadcrumb labels and case/spelling variants, relevant collections, and visible
+   all three exact Breadcrumb type labels and case/spelling variants, relevant collections, and visible
    rules. Safe GET or filesystem reads never require approval.
 2. Read package/build manifests, scripts, test configuration, test conventions, CI workflows and
    required checks, contributor documentation, and existing `.breadcrumb/verification.md`.
@@ -222,6 +222,8 @@ After prerequisites and material questions are resolved, render one complete pla
 
 1. For each type label, the exact name, description, color, current state, and operation:
    `none`, `create`, `case-only rename`, or `metadata update`:
+   - `breadcrumb:backlog`, description
+     `Breadcrumb backlog: deferred ideas without scheduling commitment`, color `6E7781`;
    - `breadcrumb:requirement`, description
      `Breadcrumb requirement: intent, scope, and acceptance criteria`, color `0E8A16`;
    - `breadcrumb:design`, description

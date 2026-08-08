@@ -10,7 +10,7 @@ from .documents import DocumentProblem, IssueStatus, parse_issue_status
 from .errors import BreadcrumbOperationalError
 from .footprints import Footprint, parse_footprint
 from .github import GitHubClient
-from .listing import DESIGN_LABEL, REQUIREMENT_LABEL, label_names
+from .listing import BACKLOG_LABEL, DESIGN_LABEL, REQUIREMENT_LABEL, TYPE_LABELS, label_names
 
 
 @dataclass(frozen=True)
@@ -51,18 +51,21 @@ def _positive_number(value: object, description: str) -> int:
 
 def _issue_type(raw: Mapping[str, Any]) -> str:
     names = label_names(raw)
-    has_requirement = REQUIREMENT_LABEL in names
-    has_design = DESIGN_LABEL in names
-    if has_requirement and has_design:
+    present = [label for label in TYPE_LABELS if label in names]
+    if len(present) > 1:
         raise ProjectionProblem(
             "conflicting_type_labels",
-            "issue has both breadcrumb:requirement and breadcrumb:design labels",
+            "issue has multiple Breadcrumb type labels: " + ", ".join(present),
         )
-    if not has_requirement and not has_design:
+    if not present:
         raise ProjectionProblem(
             "missing_type_label", "issue has no Breadcrumb type label"
         )
-    return "requirement" if has_requirement else "design"
+    return {
+        BACKLOG_LABEL: "backlog",
+        REQUIREMENT_LABEL: "requirement",
+        DESIGN_LABEL: "design",
+    }[present[0]]
 
 
 def _load_issue(raw: Mapping[str, Any], expected_number: int | None = None) -> LoadedIssue:
@@ -271,6 +274,15 @@ def _projection(
     }
 
 
+def _backlog_projection(issue: LoadedIssue) -> dict[str, object]:
+    return {
+        "number": issue.number,
+        "title": issue.title,
+        "type": "backlog",
+        "state": issue.state,
+    }
+
+
 def get_issue_progress(
     client: GitHubClient, issue_numbers: list[int]
 ) -> dict[str, object]:
@@ -331,13 +343,16 @@ def get_issue_progress(
         artifact_cache[design_number] = artifact
         return artifact
 
+    backlog_results: list[dict[str, object]] = []
     requirement_results: list[dict[str, object]] = []
     design_results: list[dict[str, object]] = []
     for number in issue_numbers:
         issue = requested.get(number)
         if issue is None or number in error_by_number:
             continue
-        if issue.issue_type == "requirement":
+        if issue.issue_type == "backlog":
+            backlog_results.append(_backlog_projection(issue))
+        elif issue.issue_type == "requirement":
             related_design = related_designs.get(number)
             artifact = _missing_artifact()
             if related_design is not None:
@@ -379,6 +394,7 @@ def get_issue_progress(
         "schema_version": SCRIPT_OUTPUT_SCHEMA_VERSION,
         "hostname": client.target.hostname,
         "repository": client.target.identity,
+        "backlogs": backlog_results,
         "requirements": requirement_results,
         "designs": design_results,
         "errors": errors,

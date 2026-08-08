@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 
 from . import (
+    SUPPORTED_BACKLOG_DOCUMENT_SCHEMA_VERSIONS,
     SUPPORTED_DESIGN_DOCUMENT_SCHEMA_VERSIONS,
     SUPPORTED_REQUIREMENT_DOCUMENT_SCHEMA_VERSIONS,
 )
@@ -36,7 +37,7 @@ class DocumentProblem(Exception):
 class IssueStatus:
     schema_version: int
     issue_type: str
-    phase: str
+    phase: str | None
     related_requirement: int | None
     refined_from: int | None
     last_step: str
@@ -58,6 +59,8 @@ def _single_line(lines: list[str], value: str, missing_code: str) -> int:
 def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
     """Parse and validate the reserved final state block in an issue body."""
 
+    if expected_type not in {"backlog", "requirement", "design"}:
+        raise DocumentProblem("invalid_type", "unsupported Breadcrumb issue type")
     if not isinstance(body, str):
         raise DocumentProblem("missing_marker", "issue body is missing")
     lines = normalize_markdown(body).split("\n")
@@ -75,27 +78,45 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
         )
 
     block = lines[start + 1 : end]
-    todo_relative = _single_line(block, TODO_HEADING, "missing_heading")
     status_relative = _single_line(block, STATUS_HEADING, "missing_heading")
-    if todo_relative >= status_relative:
-        raise DocumentProblem(
-            "invalid_heading_order", "Todo must precede Breadcrumb Status"
-        )
-
     has_unchecked = False
-    for relative, line in enumerate(block[todo_relative + 1 : status_relative]):
-        if not line.strip():
-            continue
-        match = _TASK_RE.fullmatch(line)
-        absolute_line = start + todo_relative + relative + 3
-        if not match:
+    if expected_type == "backlog":
+        todo_matches = [index for index, line in enumerate(block) if line == TODO_HEADING]
+        if todo_matches:
             raise DocumentProblem(
-                "invalid_todo",
-                "Todo may contain only valid Markdown task-list items",
-                absolute_line,
+                "invalid_heading",
+                "Backlog state must not contain Todo",
+                start + todo_matches[0] + 2,
             )
-        if match.group(1) == " ":
-            has_unchecked = True
+        first_content = next(
+            (index for index, line in enumerate(block[:status_relative]) if line.strip()),
+            None,
+        )
+        if first_content is not None:
+            raise DocumentProblem(
+                "invalid_status",
+                "Backlog state may contain only Breadcrumb Status",
+                start + first_content + 2,
+            )
+    else:
+        todo_relative = _single_line(block, TODO_HEADING, "missing_heading")
+        if todo_relative >= status_relative:
+            raise DocumentProblem(
+                "invalid_heading_order", "Todo must precede Breadcrumb Status"
+            )
+        for relative, line in enumerate(block[todo_relative + 1 : status_relative]):
+            if not line.strip():
+                continue
+            match = _TASK_RE.fullmatch(line)
+            absolute_line = start + todo_relative + relative + 3
+            if not match:
+                raise DocumentProblem(
+                    "invalid_todo",
+                    "Todo may contain only valid Markdown task-list items",
+                    absolute_line,
+                )
+            if match.group(1) == " ":
+                has_unchecked = True
 
     fields: dict[str, tuple[str, int]] = {}
     field_order: list[str] = []
@@ -118,7 +139,11 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
         fields[name] = (value, absolute_line)
         field_order.append(name)
 
-    base_required = ["Schema Version", "Type", "Phase"]
+    base_required = (
+        ["Schema Version", "Type"]
+        if expected_type == "backlog"
+        else ["Schema Version", "Type", "Phase"]
+    )
     for name in base_required:
         if name not in fields:
             raise DocumentProblem(
@@ -126,18 +151,18 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
             )
 
     issue_type = fields["Type"][0]
-    if issue_type not in {"requirement", "design"} or issue_type != expected_type:
+    if issue_type not in {"backlog", "requirement", "design"} or issue_type != expected_type:
         raise DocumentProblem(
             "invalid_type",
             f"Breadcrumb Type must be {expected_type}",
             fields["Type"][1],
         )
 
-    supported_versions = (
-        SUPPORTED_REQUIREMENT_DOCUMENT_SCHEMA_VERSIONS
-        if expected_type == "requirement"
-        else SUPPORTED_DESIGN_DOCUMENT_SCHEMA_VERSIONS
-    )
+    supported_versions = {
+        "backlog": SUPPORTED_BACKLOG_DOCUMENT_SCHEMA_VERSIONS,
+        "requirement": SUPPORTED_REQUIREMENT_DOCUMENT_SCHEMA_VERSIONS,
+        "design": SUPPORTED_DESIGN_DOCUMENT_SCHEMA_VERSIONS,
+    }[expected_type]
     schema_value = fields["Schema Version"][0]
     allowed_schema_values = {str(version) for version in supported_versions}
     if schema_value not in allowed_schema_values:
@@ -152,7 +177,7 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
     required = list(base_required)
     if expected_type == "design":
         required.extend(("Related Requirement", "Refined From"))
-    elif schema_version == 1:
+    elif expected_type == "requirement" and schema_version == 1:
         required.append("Refined From")
     required.append("Last Breadcrumb Step")
     for name in required:
@@ -181,20 +206,22 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
             fields[name][1],
         )
 
-    phase = fields["Phase"][0]
-    if phase not in {"draft", "ready"}:
-        raise DocumentProblem(
-            "invalid_phase",
-            "Breadcrumb Phase must be draft or ready",
-            fields["Phase"][1],
-        )
-    expected_phase = "draft" if has_unchecked else "ready"
-    if phase != expected_phase:
-        raise DocumentProblem(
-            "invalid_phase",
-            f"Breadcrumb Phase must be {expected_phase} for the current Todo state",
-            fields["Phase"][1],
-        )
+    phase = None
+    if expected_type != "backlog":
+        phase = fields["Phase"][0]
+        if phase not in {"draft", "ready"}:
+            raise DocumentProblem(
+                "invalid_phase",
+                "Breadcrumb Phase must be draft or ready",
+                fields["Phase"][1],
+            )
+        expected_phase = "draft" if has_unchecked else "ready"
+        if phase != expected_phase:
+            raise DocumentProblem(
+                "invalid_phase",
+                f"Breadcrumb Phase must be {expected_phase} for the current Todo state",
+                fields["Phase"][1],
+            )
 
     refined_from = None
     if "Refined From" in fields:
@@ -210,7 +237,11 @@ def parse_issue_status(body: object, expected_type: str) -> IssueStatus:
             refined_from = int(refined_match.group(1))
 
     last_step = fields["Last Breadcrumb Step"][0]
-    allowed_last_steps = {"open", "refine"} if expected_type == "requirement" else {"design"}
+    allowed_last_steps = {
+        "backlog": {"backlog"},
+        "requirement": {"open", "refine"},
+        "design": {"design"},
+    }[expected_type]
     if last_step not in allowed_last_steps:
         raise DocumentProblem(
             "invalid_last_step",

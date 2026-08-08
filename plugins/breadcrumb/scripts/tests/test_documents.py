@@ -20,6 +20,36 @@ class IssueBodyTests(unittest.TestCase):
         self.assertEqual(design_status.schema_version, 1)
         self.assertEqual(design_status.related_requirement, 12)
 
+    def test_backlog_status_has_no_phase_or_todo(self) -> None:
+        backlog = copied_fixture("backlog_issue.json")
+        status = parse_issue_status(backlog["body"], "backlog")
+        self.assertEqual(status.schema_version, 1)
+        self.assertEqual(status.issue_type, "backlog")
+        self.assertIsNone(status.phase)
+        self.assertIsNone(status.related_requirement)
+        self.assertIsNone(status.refined_from)
+        self.assertEqual(status.last_step, "backlog")
+
+    def test_backlog_rejects_todo_phase_and_trailing_content(self) -> None:
+        body = copied_fixture("backlog_issue.json")["body"]
+        variants = (
+            (body.replace("## Breadcrumb Status", "## Todo\n\n## Breadcrumb Status"), "invalid_heading"),
+            (body.replace("- Type: backlog", "- Type: backlog\n- Phase: ready"), "unknown_field"),
+            (body.replace("- Type: backlog", "- Type: requirement"), "invalid_type"),
+            (
+                body.replace(
+                    "<!-- breadcrumb:state:start -->",
+                    "<!-- breadcrumb:state:start -->\n<!-- breadcrumb:state:start -->",
+                ),
+                "duplicate_marker",
+            ),
+            (body + "\ntrailing", "invalid_marker_order"),
+        )
+        for value, code in variants:
+            with self.subTest(code=code), self.assertRaises(DocumentProblem) as raised:
+                parse_issue_status(value, "backlog")
+            self.assertEqual(raised.exception.code, code)
+
     def test_legacy_requirement_status_remains_supported(self) -> None:
         issue = copied_fixture("requirement_issue_v1.json")
         status = parse_issue_status(issue["body"], "requirement")

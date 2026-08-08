@@ -10,8 +10,10 @@ from .errors import BreadcrumbOperationalError
 from .github import GitHubClient
 
 
+BACKLOG_LABEL = "breadcrumb:backlog"
 REQUIREMENT_LABEL = "breadcrumb:requirement"
 DESIGN_LABEL = "breadcrumb:design"
+TYPE_LABELS = (BACKLOG_LABEL, REQUIREMENT_LABEL, DESIGN_LABEL)
 
 
 def label_names(issue: Mapping[str, Any]) -> set[str]:
@@ -43,12 +45,14 @@ def _number(issue: Mapping[str, Any]) -> int:
 
 
 def list_issue_numbers(client: GitHubClient, type_filter: str) -> dict[str, object]:
-    if type_filter not in {"all", "requirement", "design"}:
+    if type_filter not in {"all", "backlog", "requirement", "design"}:
         raise BreadcrumbOperationalError(
-            "invalid_type_filter", "type filter must be all, requirement, or design"
+            "invalid_type_filter", "type filter must be all, backlog, requirement, or design"
         )
 
     labels = []
+    if type_filter in {"all", "backlog"}:
+        labels.append(BACKLOG_LABEL)
     if type_filter in {"all", "requirement"}:
         labels.append(REQUIREMENT_LABEL)
     if type_filter in {"all", "design"}:
@@ -61,26 +65,26 @@ def list_issue_numbers(client: GitHubClient, type_filter: str) -> dict[str, obje
                 continue
             issues_by_number[_number(issue)] = issue
 
+    backlogs: list[int] = []
     requirements: list[int] = []
     designs: list[int] = []
     invalid: list[dict[str, object]] = []
     for number in sorted(issues_by_number):
         names = label_names(issues_by_number[number])
-        has_requirement = REQUIREMENT_LABEL in names
-        has_design = DESIGN_LABEL in names
-        if has_requirement and has_design:
+        present = [label for label in TYPE_LABELS if label in names]
+        if len(present) > 1:
             invalid.append(
                 {
                     "number": number,
                     "code": "conflicting_type_labels",
-                    "message": (
-                        "issue has both breadcrumb:requirement and breadcrumb:design labels"
-                    ),
+                    "message": "issue has multiple Breadcrumb type labels: " + ", ".join(present),
                 }
             )
-        elif has_requirement and type_filter in {"all", "requirement"}:
+        elif present == [BACKLOG_LABEL] and type_filter in {"all", "backlog"}:
+            backlogs.append(number)
+        elif present == [REQUIREMENT_LABEL] and type_filter in {"all", "requirement"}:
             requirements.append(number)
-        elif has_design and type_filter in {"all", "design"}:
+        elif present == [DESIGN_LABEL] and type_filter in {"all", "design"}:
             designs.append(number)
 
     return {
@@ -88,6 +92,7 @@ def list_issue_numbers(client: GitHubClient, type_filter: str) -> dict[str, obje
         "hostname": client.target.hostname,
         "repository": client.target.identity,
         "filter": type_filter,
+        "backlogs": backlogs,
         "requirements": requirements,
         "designs": designs,
         "invalid": invalid,
