@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breadcrumb Report"
+  short_description: "Report a Breadcrumb bug or feature request"
+  default_prompt: "Use $breadcrumb-report to report a bug or suggest a feature from this conversation."
