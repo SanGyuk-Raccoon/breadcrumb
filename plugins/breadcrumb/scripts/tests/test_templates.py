@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import tempfile
 import unittest
-from pathlib import Path
 
 from support import SCRIPT_ROOT
 
+from internal.comments import parse_breadcrumb_comment
+from internal.documents import parse_work_body
 from internal.template_validation import (
-    TEMPLATE_TYPES,
-    validate_active_templates,
+    TEMPLATE_FILES,
+    validate_bundled_templates,
     validate_template,
 )
 
@@ -16,171 +16,62 @@ from internal.template_validation import (
 PLUGIN_ROOT = SCRIPT_ROOT.parent
 
 
-class TemplateValidationTests(unittest.TestCase):
-    def test_bundled_templates_are_valid(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            result = validate_active_templates(
-                TEMPLATE_TYPES,
-                repository_root=Path(directory),
-                plugin_root=PLUGIN_ROOT,
-            )
-        self.assertTrue(result["valid"])
-        self.assertEqual(len(result["templates"]), 5)
-        self.assertTrue(all(item["source"] == "plugin" for item in result["templates"]))
+class TemplateTests(unittest.TestCase):
+    def test_all_four_bundled_templates_are_valid(self) -> None:
+        result = validate_bundled_templates(PLUGIN_ROOT)
+        self.assertTrue(result["valid"], result["errors"])
+        self.assertEqual(len(result["templates"]), 4)
+        self.assertEqual(set(TEMPLATE_FILES), {
+            "work",
+            "comment-implementation",
+            "comment-implementation-stale",
+            "pull-request",
+        })
 
-    def test_repository_override_is_selected_independently(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            override = root / ".breadcrumb" / "templates"
-            override.mkdir(parents=True)
-            override.joinpath("requirement.md").write_text(
-                (PLUGIN_ROOT / "templates" / "requirement.md").read_text(encoding="utf-8"),
-                encoding="utf-8",
-            )
-            result = validate_active_templates(
-                TEMPLATE_TYPES, repository_root=root, plugin_root=PLUGIN_ROOT
-            )
-        sources = {item["type"]: item["source"] for item in result["templates"]}
-        self.assertEqual(sources["requirement"], "repository")
-        self.assertEqual(sources["design"], "plugin")
+    def test_fixed_templates_reject_markers_and_shape_changes(self) -> None:
+        work = (PLUGIN_ROOT / "templates" / "work.md").read_text(encoding="utf-8")
+        self.assertTrue(validate_template("work", "<!-- marker -->\n" + work))
+        self.assertTrue(validate_template("work", work.replace("## Goal", "## Objective")))
+        pull = (PLUGIN_ROOT / "templates" / "pull-request.md").read_text(encoding="utf-8")
+        self.assertTrue(validate_template("pull-request", pull.replace("Closes", "Fixes")))
 
-    def test_invalid_override_does_not_fall_back(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            override = root / ".breadcrumb" / "templates"
-            override.mkdir(parents=True)
-            override.joinpath("design.md").write_text("## Technical Design\n", encoding="utf-8")
-            result = validate_active_templates(
-                ("design",), repository_root=root, plugin_root=PLUGIN_ROOT
-            )
-        self.assertFalse(result["valid"])
-        self.assertEqual(result["templates"][0]["source"], "repository")
-        self.assertIn("missing_marker", {error["code"] for error in result["errors"]})
+    def test_rendered_work_template_matches_document_parser(self) -> None:
+        rendered = (PLUGIN_ROOT / "templates" / "work.md").read_text(encoding="utf-8")
+        replacements = {
+            "<background>": "Context.",
+            "<goal>": "Outcome.",
+            "<requirements>": "- Required behavior.",
+            "<design>": "Use the existing component.",
+            "<verification>": "Run unit tests.",
+            "<todo>": "- [x] Planning completed.",
+            "<backlog-or-in-progress-or-complete>": "complete",
+        }
+        for source, target in replacements.items():
+            rendered = rendered.replace(source, target)
+        result = parse_work_body(rendered)
+        self.assertTrue(result.valid, result.errors)
 
-    def test_repository_override_symlink_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            override = root / ".breadcrumb" / "templates"
-            override.mkdir(parents=True)
-            override.joinpath("requirement.md").symlink_to(
-                PLUGIN_ROOT / "templates" / "requirement.md"
-            )
-            result = validate_active_templates(
-                ("requirement",), repository_root=root, plugin_root=PLUGIN_ROOT
-            )
-        self.assertFalse(result["valid"])
-        self.assertEqual(result["errors"][0]["code"], "template_unreadable")
-
-    def test_backlog_override_symlink_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            override = root / ".breadcrumb" / "templates"
-            override.mkdir(parents=True)
-            override.joinpath("backlog.md").symlink_to(
-                PLUGIN_ROOT / "templates" / "backlog.md"
-            )
-            result = validate_active_templates(
-                ("backlog",), repository_root=root, plugin_root=PLUGIN_ROOT
-            )
-        self.assertFalse(result["valid"])
-        self.assertEqual(result["errors"][0]["code"], "template_unreadable")
-
-    def test_missing_and_unreadable_templates_have_stable_errors(self) -> None:
-        with tempfile.TemporaryDirectory() as repository, tempfile.TemporaryDirectory() as plugin:
-            missing = validate_active_templates(
-                ("requirement",),
-                repository_root=Path(repository),
-                plugin_root=Path(plugin),
-            )
-            path = Path(plugin) / "templates" / "requirement.md"
-            path.mkdir(parents=True)
-            unreadable = validate_active_templates(
-                ("requirement",),
-                repository_root=Path(repository),
-                plugin_root=Path(plugin),
-            )
-        self.assertEqual(missing["errors"][0]["code"], "template_not_found")
-        self.assertEqual(unreadable["errors"][0]["code"], "template_unreadable")
-
-    def test_contract_errors_are_structured(self) -> None:
-        requirement = (PLUGIN_ROOT / "templates" / "requirement.md").read_text(
+    def test_rendered_implementation_template_matches_comment_parser(self) -> None:
+        rendered = (PLUGIN_ROOT / "templates" / "comment-implementation.md").read_text(
             encoding="utf-8"
         )
-        errors = validate_template(
-            "requirement",
-            requirement.replace("- Type: requirement", "- Type: design").replace(
-                "<!-- breadcrumb:state:end -->", ""
-            ),
+        replacements = {
+            "<branch>": "breadcrumb/18-example",
+            "<branch-url>": "https://github.com/acme/widgets/tree/breadcrumb/18-example",
+            "<commit>": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "<commit-url>": "https://github.com/acme/widgets/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "<passed-or-failed-or-pending>": "passed",
+            "<summary>": "Implemented the change.",
+            "<verification-report>": "Unit tests passed.",
+        }
+        for source, target in replacements.items():
+            rendered = rendered.replace(source, target)
+        result = parse_breadcrumb_comment(
+            rendered,
+            expected_issue=18,
+            repository_url="https://github.com/acme/widgets",
         )
-        self.assertEqual(
-            {error.code for error in errors}, {"missing_marker", "invalid_type"}
-        )
-
-        pull_errors = validate_template(
-            "pull-request", "## Summary\n\nCloses #123\n"
-        )
-        self.assertEqual(pull_errors[0].code, "forbidden_pr_metadata")
-
-    def test_legacy_requirement_override_requires_schema_two(self) -> None:
-        requirement = (PLUGIN_ROOT / "templates" / "requirement.md").read_text(
-            encoding="utf-8"
-        )
-        legacy_requirement = requirement.replace(
-            "- Schema Version: 2", "- Schema Version: 1"
-        ).replace(
-            "- Last Breadcrumb Step: <open-or-refine>",
-            "- Refined From: <issue-reference-or-none>\n"
-            "- Last Breadcrumb Step: <open-or-refine>",
-        )
-        errors = validate_template(
-            "requirement",
-            legacy_requirement,
-        )
-        self.assertIn("invalid_schema_version", {error.code for error in errors})
-        self.assertIn(
-            "unknown Breadcrumb Status field Refined From",
-            {error.message for error in errors},
-        )
-
-    def test_ordinary_template_content_is_not_executed_or_interpreted(self) -> None:
-        pull = "## Summary\n\n`$(touch should-not-exist)` is ordinary Markdown.\n"
-        self.assertEqual(validate_template("pull-request", pull), [])
-
-    def test_state_template_rejects_inexact_and_reordered_machine_lines(self) -> None:
-        requirement = (PLUGIN_ROOT / "templates" / "requirement.md").read_text(
-            encoding="utf-8"
-        )
-        variants = (
-            requirement.replace("## Todo", " ## Todo"),
-            requirement.replace(
-                "- Schema Version: 2\n- Type: requirement",
-                "- Type: requirement\n- Schema Version: 2",
-            ),
-            requirement.replace(
-                "- Last Breadcrumb Step: <open-or-refine>",
-                "- Extra: value\n- Last Breadcrumb Step: <open-or-refine>",
-            ),
-        )
-        for variant in variants:
-            with self.subTest():
-                self.assertTrue(validate_template("requirement", variant))
-
-    def test_backlog_template_rejects_todo_phase_and_invalid_step(self) -> None:
-        backlog = (PLUGIN_ROOT / "templates" / "backlog.md").read_text(encoding="utf-8")
-        variants = (
-            backlog.replace("## Breadcrumb Status", "## Todo\n\n## Breadcrumb Status"),
-            backlog.replace("- Type: backlog", "- Type: backlog\n- Phase: ready"),
-            backlog.replace("- Type: backlog", "- Type: requirement"),
-            backlog.replace("- Last Breadcrumb Step: backlog", "- Last Breadcrumb Step: open"),
-            backlog.replace(
-                "<!-- breadcrumb:state:start -->",
-                "<!-- breadcrumb:state:start -->\n<!-- breadcrumb:state:start -->",
-            ),
-            backlog + "\ntrailing",
-        )
-        for variant in variants:
-            with self.subTest():
-                self.assertTrue(validate_template("backlog", variant))
+        self.assertEqual(result.outcome, "valid")
 
 
 if __name__ == "__main__":

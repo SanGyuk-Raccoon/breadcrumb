@@ -1,15 +1,15 @@
 {
   "name": "breadcrumb",
-  "version": "0.2.0+codex.20260722154208",
-  "description": "GitHub issue based durable-memory workflow for AI-assisted development",
+  "version": "0.2.0+codex.20260809092234",
+  "description": "Single-issue GitHub workflow for durable AI-assisted development",
   "author": {
     "name": "Breadcrumb contributors"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Breadcrumb",
-    "shortDescription": "Durable AI development context in GitHub issues.",
-    "longDescription": "Capture requirements, designs, implementation evidence, and pull requests as durable GitHub workflow artifacts that can be resumed across Codex sessions.",
+    "shortDescription": "One durable GitHub issue from idea to pull request.",
+    "longDescription": "Plan, implement, verify, and publish one cohesive change through a single durable GitHub work issue and one Breadcrumb skill.",
     "developerName": "Breadcrumb contributors",
     "category": "Productivity",
     "capabilities": [
@@ -18,9 +18,9 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Initialize this repository with Breadcrumb.",
-      "Capture this request as a Breadcrumb requirement.",
-      "Show the current Breadcrumb workflow progress."
+      "Initialize this repository for Breadcrumb.",
+      "Capture this work in one Breadcrumb issue.",
+      "Continue the current Breadcrumb work issue."
     ]
   }
 }

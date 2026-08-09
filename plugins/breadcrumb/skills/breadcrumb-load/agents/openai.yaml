@@ -1,4 +1,0 @@
-interface:
-  display_name: "Breadcrumb Load"
-  short_description: "Load and summarize durable Breadcrumb context"
-  default_prompt: "Use $breadcrumb-load to load this Breadcrumb issue."

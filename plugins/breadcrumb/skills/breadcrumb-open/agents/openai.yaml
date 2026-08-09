@@ -1,4 +1,0 @@
-interface:
-  display_name: "Breadcrumb Open"
-  short_description: "Create one requirement or a recursively split issue plan"
-  default_prompt: "Use $breadcrumb-open to clarify this request and create one requirement or an approved split set."

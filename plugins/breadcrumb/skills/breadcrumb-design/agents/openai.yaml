@@ -1,4 +1,0 @@
-interface:
-  display_name: "Breadcrumb Design"
-  short_description: "Design a ready requirement into an issue"
-  default_prompt: "Use $breadcrumb-design to design this requirement."
