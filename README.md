@@ -30,11 +30,10 @@ breadcrumb
 
 It routes natural-language intent internally:
 
-- initialize or audit a repository;
+- initialize or audit a repository and coordinate any version migration it discovers;
 - open, list, load, update, or review a work issue;
 - implement and verify a complete issue;
-- create or reuse its linked pull request;
-- migrate open legacy Breadcrumb issues when explicitly requested.
+- create or reuse its linked pull request.
 
 Explicit intent wins over state. State validates whether the operation can run. An ambiguous request
 loads current state without mutating it.
@@ -75,6 +74,14 @@ A consuming repository keeps only repository-specific verification guidance:
 
 Breadcrumb derives repository identity and default branch from the Git root, remotes, and current
 GitHub metadata. It does not create `.breadcrumb/config.json` or `.breadcrumb/templates/`.
+
+`init` is also the version-migration entry point. Its read-only audit inventories unsupported
+config/template paths without loading them, legacy phase labels and open issues, and exact legacy
+Bug or Feature Request bodies. When candidates exist it shows the complete file, issue, label,
+commit, and close plan before requesting the required cleanup or bulk-migration confirmation. It
+does not mutate merely because initialization was requested, and it asks no migration question when
+there is nothing to migrate. Normal `list` and `inspect` remain strict schema 1 projections with no
+legacy compatibility parsing.
 
 Implementation branches use a stable name derived from the work issue:
 

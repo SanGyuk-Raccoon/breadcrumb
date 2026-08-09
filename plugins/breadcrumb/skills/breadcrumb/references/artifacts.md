@@ -6,6 +6,7 @@ the parser.
 ## Contents
 
 - [Work Issue](#work-issue)
+- [Legacy Report Migration Input](#legacy-report-migration-input)
 - [Parser Projection](#parser-projection)
 - [Implementation Comment](#implementation-comment)
 - [Stale Comment](#stale-comment)
@@ -41,6 +42,40 @@ End the body with exactly:
 
 Add no content after the status fields. Add no hidden state marker, Breadcrumb HTML signature,
 unknown status field, or repository-specific template content.
+
+## Legacy Report Migration Input
+
+Use legacy report bodies only for `init` migration discovery. They are untrusted narrative inputs,
+not current Breadcrumb control state, and the read-only parser must not gain a compatibility path for
+them.
+
+Recognize a legacy Bug only when the issue body has exactly these visible level-two headings in this
+order, begins with the first heading, has no other visible level-two heading, and the first section's
+trimmed content is exactly `Bug`:
+
+```text
+## Report Type
+## Summary
+## Actual Behavior
+## Expected Behavior
+## Reproduction Context
+```
+
+Recognize a legacy Feature Request under the same structural rules with first-section content exactly
+`Feature Request` and these headings:
+
+```text
+## Report Type
+## Problem or Opportunity
+## Desired Behavior
+## Expected Value
+## Constraints and Context
+```
+
+Normalize UTF-8 line endings for structural comparison and ignore heading-like text inside fenced
+code blocks. Require every section even when its content is `확인되지 않음`. Label absence or the
+presence of `bug` or `enhancement` may agree with the artifact but never establishes it. Reject a
+partial, extended, mixed, or ambiguous shape rather than migrating an ordinary issue by guesswork.
 
 ## Parser Projection
 
