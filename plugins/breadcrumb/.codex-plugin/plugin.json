@@ -1,15 +1,15 @@
 {
   "name": "breadcrumb",
-  "version": "0.2.0+codex.20260809115331",
-  "description": "Single-issue GitHub workflow for durable AI-assisted development",
+  "version": "0.2.0+codex.20260809122041",
+  "description": "Durable GitHub work issues and privacy-minimized product reporting",
   "author": {
     "name": "Breadcrumb contributors"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Breadcrumb",
-    "shortDescription": "One durable GitHub issue from idea to pull request.",
-    "longDescription": "Plan, implement, verify, and publish one cohesive change through a single durable GitHub work issue and one Breadcrumb skill.",
+    "shortDescription": "Durable GitHub work and product reporting.",
+    "longDescription": "Plan, implement, verify, and publish cohesive work through durable GitHub issues, and capture privacy-minimized Breadcrumb product reports as backlog work.",
     "developerName": "Breadcrumb contributors",
     "category": "Productivity",
     "capabilities": [
@@ -20,7 +20,8 @@
     "defaultPrompt": [
       "Initialize this repository for Breadcrumb.",
       "Capture this work in one Breadcrumb issue.",
-      "Continue the current Breadcrumb work issue."
+      "Continue the current Breadcrumb work issue.",
+      "Report a Breadcrumb bug or feature request from this conversation."
     ]
   }
 }

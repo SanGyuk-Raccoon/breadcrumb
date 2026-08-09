@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breadcrumb Report"
+  short_description: "Turn feedback into a Breadcrumb backlog issue"
+  default_prompt: "Use $breadcrumb-report to turn this conversation into a privacy-minimized Breadcrumb product report."
