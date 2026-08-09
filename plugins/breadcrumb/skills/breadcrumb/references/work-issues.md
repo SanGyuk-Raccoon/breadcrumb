@@ -10,9 +10,13 @@ Apply the shared rules in `SKILL.md` and the exact contracts in `artifacts.md`.
 - [Load](#load)
 - [Update](#update)
 - [Review](#review)
-- [Migrate Legacy Open Issues](#migrate-legacy-open-issues)
 
 ## Initialize Or Audit
+
+Treat repository setup, re-audit, and version migration as one `init` operation. Discovery is always
+read-only; an explicit init request does not approve migration side effects.
+
+### Resolve Readiness
 
 1. Resolve the Git root, selected remote, GitHub repository, and current default branch without a
    Breadcrumb config file. Check Git, GitHub CLI, Python 3.11+, authentication, Issues availability,
@@ -26,10 +30,73 @@ Apply the shared rules in `SKILL.md` and the exact contracts in `artifacts.md`.
 4. Require `verification.md` to be tracked, unmodified, and published on the fetched default branch
    before implementation. Permit issue-only operations while it is missing, but report that
    implementation is not ready.
-5. Remove neither legacy config/templates nor labels during an ordinary audit. Handle those only in
-   the confirmed migration flow below.
-6. Report readiness by operation rather than one global boolean: issue reads, issue writes,
-   implementation fetch/push, verification, and PR writes.
+
+### Discover Version Migration
+
+1. Inventory `.breadcrumb/config.json`, `.breadcrumb/templates`, and every path contained by that
+   directory without reading file bytes, loading template overrides, or following a symlink. Record
+   the exact path, kind, containment, tracking, staged/unstaged state, and whether the fetched default
+   branch contains each artifact.
+2. Fully paginate repository labels and GitHub-open issues. Find issues carrying
+   `breadcrumb:backlog`, `breadcrumb:requirement`, or `breadcrumb:design`, and independently find
+   issue bodies matching a complete legacy Bug or Feature Request contract from `artifacts.md`.
+   Exclude pull requests. A label alone never proves that an ordinary issue is a legacy report.
+3. Leave every already-closed issue body untouched. Read a closed issue or merged pull request only
+   when needed as evidence that an open migration candidate has already been delivered.
+4. Compare the worktree, index, local commits, fetched default branch, and planned verification
+   publication. If one unpublished commit contains both supported setup state and legacy files,
+   record the exact commit and paths; do not push it before the user chooses cleanup or intentional
+   preservation and publication.
+5. When no local or GitHub migration candidate exists, ask no migration question and finish the
+   ordinary readiness audit.
+
+### Plan And Confirm Migration
+
+1. Group local file cleanup separately from GitHub issue, close/relabel, and label-deletion actions.
+   Show the selected repository and every exact path, issue number, current and final title, complete
+   final body, current and final label set, close action, affected local commit, and closed-issue
+   metadata effect before the first mutation.
+2. For one open requirement/design pair, select a canonical work issue only from durable lineage and
+   body context, never titles alone. Combine all material Background through Design and Todo context
+   into the proposed work body and show how the redundant open issue will be closed or relabeled.
+3. Convert an unpaired open legacy phase issue in place only when its meaning is unambiguous. For an
+   undelivered legacy Bug, map report type, summary, actual behavior, and reproduction context to
+   Background and expected behavior to Goal. For an undelivered Feature Request, map report type,
+   problem, and context to Background, desired behavior to Goal, and expected value and constraints
+   to Requirements. Preserve all material narrative in a schema 1 work issue, set `Status: backlog`,
+   add exactly `- [ ] 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다.`, and use
+   only `breadcrumb` as its final label. When a merged PR already satisfies a report, show that exact
+   evidence and proposed close action instead of pretending it remains backlog work.
+4. Ask explicitly before removing legacy files, rewriting an unpublished setup commit,
+   bulk-migrating issues, or publishing a commit that intentionally retains unsupported files. Ask
+   separately before deleting legacy labels. A changed path, issue, body, label, commit, or delivery
+   basis invalidates the corresponding approval. Never rewrite a commit reachable from a published
+   ref.
+5. When the user declines, preserve every declined artifact. Report that the current Breadcrumb
+   version ignores it, the effect on readiness, and the exact remaining follow-up.
+
+### Apply Approved Migration
+
+1. Immediately revalidate repository identity, default branch, complete worktree/index state,
+   candidate paths without following symlinks, labels, issue bodies/states, linked delivery evidence,
+   and every approved payload. Stop before the first write when the basis changed.
+2. Remove only approved exact legacy paths. Preserve unrelated and overlapping user changes; stage
+   only approved paths, inspect the staged path set and diff, and use a scoped commit when repository
+   state must be published. Never infer history rewriting, staging of unrelated files, or a push.
+3. Apply each approved issue body/label/close mutation once with structured JSON and explicit
+   owner/repository. Verify each successful issue number and final state before continuing. Never
+   create a replacement issue when an in-place conversion was approved.
+4. Requery until no GitHub-open legacy phase or report issue remains. Only then may a separately
+   approved deletion remove the three legacy labels; explain that deletion removes label metadata
+   from historical closed issues without changing their bodies.
+5. Stop on failure or uncertainty. Preserve successful earlier operations, do not retry or roll them
+   back blindly, and report completed, failed or uncertain, and unattempted steps separately.
+
+### Report Readiness
+
+Report readiness by operation rather than one global boolean: issue reads, issue writes,
+implementation fetch/push, verification, and PR writes. Include preserved or unpublished legacy
+state only where it affects that operation.
 
 ## Open
 
@@ -106,20 +173,3 @@ Apply the shared rules in `SKILL.md` and the exact contracts in `artifacts.md`.
 3. Lead with actionable findings ordered by severity. Cite issue headings, paths/lines, commits, or
    diff locations. Distinguish fact, inference, unanswered question, and residual risk.
 4. Recommend `update` or implementation follow-up when appropriate, but persist nothing.
-
-## Migrate Legacy Open Issues
-
-Run migration only when explicitly requested and confirmed as a bulk operation.
-
-1. Fully list issues carrying `breadcrumb:backlog`, `breadcrumb:requirement`, or
-   `breadcrumb:design`. Select only GitHub-open issues. Leave every closed issue untouched.
-2. When one open requirement and one open design form a valid pair, choose one canonical work issue,
-   combine all material Background through Design and Todo context, apply the new body and
-   `breadcrumb` label, and close or relabel the redundant open issue only as shown in the approved
-   migration plan. Never infer a pair from titles alone.
-3. Convert an unpaired open legacy issue in place when its meaning is unambiguous. Show every final
-   title, body, label set, and close action before the first mutation. Stop and report partial
-   progress on uncertainty; never retry creates or patches blindly.
-4. Requery until no open legacy issue remains. Ask separately before deleting the three legacy
-   labels. Deleting labels must not modify closed issue bodies; GitHub will only remove the deleted
-   label metadata from historical issues.
