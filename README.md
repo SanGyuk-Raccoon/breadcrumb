@@ -20,15 +20,16 @@ Meaningful completed Todo items remain checked as durable decision history. New 
 appended while work evolves. Requirement and design changes after implementation mark the previous
 implementation stale and return the issue to `in-progress`.
 
-## One Skill
+## Skills
 
-The plugin exposes one skill:
+The plugin exposes two user-facing skills:
 
 ```text
 breadcrumb
+breadcrumb-report
 ```
 
-It routes natural-language intent internally:
+`breadcrumb` routes the ordinary work lifecycle internally:
 
 - initialize or audit a repository and coordinate any version migration it discovers;
 - open, list, load, update, or review a work issue;
@@ -37,6 +38,14 @@ It routes natural-language intent internally:
 
 Explicit intent wins over state. State validates whether the operation can run. An ambiguous request
 loads current state without mutating it.
+
+`breadcrumb-report` turns the current conversation into a privacy-minimized `Bug` or
+`Feature Request` for the fixed `github.com/SanGyuk-Raccoon/breadcrumb` upstream. It searches open
+and closed issues completely before proposing a write. An independently actionable report is
+rendered from the bundled `work.md` as a schema 1 `backlog` work issue with exactly the `breadcrumb`
+label and one refinement Todo; useful new context for an existing report is proposed as one minimal
+comment. Both write paths require an exact preview and explicit approval. Old report artifacts remain
+an `init` migration concern rather than a compatibility mode in `list` or `inspect`.
 
 ## Work Issue
 
@@ -154,5 +163,6 @@ Run the full standard-library test suite:
 python3.12 -m unittest discover -s plugins/breadcrumb/scripts/tests -v
 ```
 
-Also validate `plugins/breadcrumb/skills/breadcrumb` with skill-creator `quick_validate.py` and the
-plugin root with plugin-creator `validate_plugin.py` before reinstalling.
+Also validate both `plugins/breadcrumb/skills/breadcrumb` and
+`plugins/breadcrumb/skills/breadcrumb-report` with skill-creator `quick_validate.py`, then validate
+the plugin root with plugin-creator `validate_plugin.py` before reinstalling.
