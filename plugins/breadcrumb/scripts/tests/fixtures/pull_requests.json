@@ -1,0 +1,24 @@
+[
+  {
+    "number": 20,
+    "url": "https://ghe.example.test/acme/widgets/pull/20",
+    "state": "OPEN",
+    "isDraft": false,
+    "headRefName": "breadcrumb/3-implement-retry-policy",
+    "baseRefName": "main",
+    "createdAt": "2026-01-04T00:00:00Z",
+    "closedAt": null,
+    "mergedAt": null
+  },
+  {
+    "number": 19,
+    "url": "https://ghe.example.test/acme/widgets/pull/19",
+    "state": "MERGED",
+    "isDraft": false,
+    "headRefName": "breadcrumb/3-implement-retry-policy",
+    "baseRefName": "main",
+    "createdAt": "2025-12-01T00:00:00Z",
+    "closedAt": "2025-12-02T00:00:00Z",
+    "mergedAt": "2025-12-02T00:00:00Z"
+  }
+]

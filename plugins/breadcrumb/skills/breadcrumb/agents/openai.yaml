@@ -1,0 +1,4 @@
+interface:
+  display_name: "Breadcrumb"
+  short_description: "Manage durable GitHub work from idea to pull request"
+  default_prompt: "Use $breadcrumb to continue the current GitHub work issue."

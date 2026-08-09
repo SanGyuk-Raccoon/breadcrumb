@@ -1,4 +1,0 @@
-interface:
-  display_name: "Breadcrumb Backlog"
-  short_description: "Save deferred ideas as durable Breadcrumb backlog"
-  default_prompt: "Use $breadcrumb-backlog to save this deferred idea for later."

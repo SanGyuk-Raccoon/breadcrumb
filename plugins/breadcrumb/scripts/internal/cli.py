@@ -8,12 +8,12 @@ import sys
 from collections.abc import Mapping
 from typing import NoReturn
 
-from . import SCRIPT_OUTPUT_SCHEMA_VERSION
+from . import PROJECTION_VERSION
 from .errors import CliUsageError, sanitized
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
-    """Argument parser that lets entry points preserve their JSON contract."""
+    """Let entry points preserve their JSON error contract."""
 
     def error(self, message: str) -> NoReturn:
         raise CliUsageError(message)
@@ -30,7 +30,7 @@ def write_diagnostic(message: object) -> None:
 
 def operational_error(code: str, message: object) -> dict[str, object]:
     return {
-        "schema_version": SCRIPT_OUTPUT_SCHEMA_VERSION,
+        "projection_version": PROJECTION_VERSION,
         "error": {
             "code": code,
             "message": sanitized(message),

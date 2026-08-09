@@ -1,4 +1,0 @@
-interface:
-  display_name: "Breadcrumb Review"
-  short_description: "Review Breadcrumb requirements, designs, or code"
-  default_prompt: "Use $breadcrumb-review to review this Breadcrumb work."

@@ -1,0 +1,34 @@
+[
+  {
+    "number": 1,
+    "title": "Captured idea",
+    "html_url": "https://ghe.example.test/acme/widgets/issues/1",
+    "state": "open",
+    "labels": [{"name": "breadcrumb"}],
+    "body": "## Background\n\nLater work\n\n## Goal\n\nDecide whether to proceed.\n\n## Requirements\n\n\n## Design\n\n\n## Verification\n\n\n## Todo\n\n- [ ] Decide the required behavior.\n\n## Breadcrumb Status\n\n- Schema Version: 1\n- Status: backlog"
+  },
+  {
+    "number": 2,
+    "title": "Refine retry behavior",
+    "html_url": "https://ghe.example.test/acme/widgets/issues/2",
+    "state": "open",
+    "labels": [{"name": "breadcrumb"}],
+    "body": "## Background\n\nRetries are inconsistent.\n\n## Goal\n\nDefine one retry policy.\n\n## Requirements\n\n- Preserve idempotency.\n\n## Design\n\n### Candidate\n\nUse bounded backoff.\n\n## Verification\n\nExercise retry exhaustion.\n\n## Todo\n\n- [x] Select bounded backoff.\n- [ ] Decide the retry limit.\n\n## Breadcrumb Status\n\n- Schema Version: 1\n- Status: in-progress"
+  },
+  {
+    "number": 3,
+    "title": "Implement retry policy",
+    "html_url": "https://ghe.example.test/acme/widgets/issues/3",
+    "state": "open",
+    "labels": [{"name": "breadcrumb"}],
+    "body": "## Background\n\nRetries are inconsistent.\n\n## Goal\n\nUse bounded retries.\n\n## Requirements\n\n- Retry three times.\n\n## Design\n\nUse the existing scheduler.\n\n## Verification\n\nRun unit tests.\n\n## Todo\n\n- [x] Select bounded backoff.\n- [x] Decide the retry limit.\n\n## Breadcrumb Status\n\n- Schema Version: 1\n- Status: complete"
+  },
+  {
+    "number": 4,
+    "title": "Contradictory issue",
+    "html_url": "https://ghe.example.test/acme/widgets/issues/4",
+    "state": "open",
+    "labels": [{"name": "breadcrumb"}],
+    "body": "## Background\n\nBroken state.\n\n## Goal\n\nRepair it.\n\n## Requirements\n\n\n## Design\n\n\n## Verification\n\n\n## Todo\n\n- [ ] Resolve the contradiction.\n\n## Breadcrumb Status\n\n- Schema Version: 1\n- Status: complete"
+  }
+]

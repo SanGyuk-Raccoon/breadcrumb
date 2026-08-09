@@ -1,4 +1,0 @@
-interface:
-  display_name: "Breadcrumb Suggest"
-  short_description: "Analyze Todo options and propose read-only decisions"
-  default_prompt: "Use $breadcrumb-suggest to analyze this Breadcrumb issue's Todo and suggest options."
