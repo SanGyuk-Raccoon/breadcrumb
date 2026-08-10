@@ -130,10 +130,11 @@ request relationships. It emits JSON only and performs no writes. A malformed is
 `valid: false` and structured errors without hiding valid siblings.
 
 The optional comment modes add a single fully paginated comment snapshot. A fixed visible
-`Breadcrumb Update` comment records the exact issue-body SHA-256 and the final ordinary comment in
-the contiguous reviewed prefix. Incremental mode returns ordinary comments after that source; all
-mode returns the full ordinary history and update artifacts. Missing, stale, malformed, or
-out-of-order checkpoints fall back toward repeated context rather than skipped comments.
+`Breadcrumb Update` comment records the exact issue-body SHA-256, a rolling digest of the reviewed
+ordinary-comment prefix, and its final source comment. Incremental mode returns ordinary comments
+after that source; all mode returns the full ordinary history and update artifacts. Missing, stale,
+malformed, changed-prefix, or out-of-order checkpoints fall back toward repeated context rather than
+skipped comments.
 
 ## Installation
 

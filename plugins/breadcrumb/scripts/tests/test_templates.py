@@ -35,6 +35,17 @@ class TemplateTests(unittest.TestCase):
         self.assertTrue(validate_template("work", work.replace("## Goal", "## Objective")))
         pull = (PLUGIN_ROOT / "templates" / "pull-request.md").read_text(encoding="utf-8")
         self.assertTrue(validate_template("pull-request", pull.replace("Closes", "Fixes")))
+        update = (PLUGIN_ROOT / "templates" / "comment-update.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertTrue(
+            validate_template(
+                "comment-update",
+                update.replace(
+                    "- Comment Prefix SHA-256: `<comment-prefix-sha256>`\n", ""
+                ),
+            )
+        )
 
     def test_rendered_work_template_matches_document_parser(self) -> None:
         rendered = (PLUGIN_ROOT / "templates" / "work.md").read_text(encoding="utf-8")
@@ -82,6 +93,7 @@ class TemplateTests(unittest.TestCase):
             "[comment](<comment-url>)|none",
             "[comment](https://github.com/acme/widgets/issues/18#issuecomment-100)",
         )
+        rendered = rendered.replace("<comment-prefix-sha256>", "b" * 64)
         rendered = rendered.replace("<body-sha256>", "a" * 64)
         rendered = rendered.replace("<summary>", "Applied the reviewed decisions.")
         result = parse_update_comment(

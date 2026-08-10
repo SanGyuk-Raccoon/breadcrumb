@@ -128,11 +128,13 @@ the default `inspect` or `list` shape:
     "requested_mode": "incremental",
     "effective_mode": "incremental",
     "body_sha256": "<64 lowercase hex characters>",
+    "empty_prefix_sha256": "<64 lowercase hex characters>",
     "checkpoint": {
       "comment_id": 205,
       "comment_url": "https://host/owner/repo/issues/18#issuecomment-205",
       "applied_through_id": 204,
-      "applied_through_url": "https://host/owner/repo/issues/18#issuecomment-204"
+      "applied_through_url": "https://host/owner/repo/issues/18#issuecomment-204",
+      "comment_prefix_sha256": "<64 lowercase hex characters>"
     },
     "items": [
       {
@@ -142,7 +144,8 @@ the default `inspect` or `list` shape:
         "updated_at": "2026-01-02T03:04:05Z",
         "author": "octocat",
         "author_association": "MEMBER",
-        "body": "T2: B"
+        "body": "T2: B",
+        "prefix_sha256": "<64 lowercase hex characters>"
       }
     ],
     "updates": [
@@ -153,6 +156,7 @@ the default `inspect` or `list` shape:
         "updated_at": "2026-01-02T03:05:00Z",
         "applied_through_id": 204,
         "applied_through_url": "https://host/owner/repo/issues/18#issuecomment-204",
+        "comment_prefix_sha256": "<64 lowercase hex characters>",
         "body_sha256": "<64 lowercase hex characters>"
       }
     ],
@@ -165,12 +169,20 @@ Return `checkpoint: null` when none is usable. `all` returns every ordinary comm
 returns ordinary comments after the selected marker's `Applied Through` source. Control-shaped
 implementation, stale, and update comments are excluded from `items`; valid trusted update artifacts
 are listed in `updates`. A missing marker returns all ordinary comments without inventing a cursor.
-A malformed latest trusted marker, current-body hash mismatch, missing source, or out-of-order source
-changes `effective_mode` to `all` and adds a structured warning. Fully paginate and order the single
-comment snapshot by creation time then positive comment ID. If an ordinary comment at or before the
-boundary has `updated_at` equal to or later than the marker's creation time, also fall back to `all`.
-Return the current raw issue body UTF-8 SHA-256 so the caller can detect a concurrent direct body
-read.
+A malformed latest trusted marker, current-body hash mismatch, changed prefix digest, missing source,
+or out-of-order source changes `effective_mode` to `all` and adds a structured warning. A `none`
+boundary is usable only when no ordinary comment precedes its marker and its prefix digest is empty.
+Fully paginate and order the single comment snapshot by creation time then positive comment ID. If an
+ordinary comment at or before the boundary has `updated_at` equal to or later than the marker's
+creation time, also fall back to `all`. Return the current raw issue body UTF-8 SHA-256 so the caller
+can detect a concurrent direct body read.
+
+Compute `empty_prefix_sha256` as SHA-256 of the exact bytes
+`Breadcrumb Comment Prefix v1\0`. Starting with that digest, compute each ordinary item's rolling
+`prefix_sha256` as SHA-256 of the previous digest bytes, one NUL byte, and the UTF-8 canonical JSON of
+the item before adding `prefix_sha256`. Canonical JSON uses sorted keys, no ASCII escaping, and `,`
+and `:` separators without spaces. This binds IDs, URLs, timestamps, author provenance, and bodies
+through each boundary while allowing incremental callers to reuse the parser-provided digest.
 
 `author` is a login string or `null` for a deleted account. Warnings use exact `code` and `message`
 strings. Keep valid trusted update history ordered even when the latest entry cannot serve as the
@@ -222,6 +234,7 @@ Load `<plugin-root>/templates/comment-update.md`. Render:
 
 - Schema Version: 1
 - Applied Through: [comment](<source-comment-url>)|none
+- Comment Prefix SHA-256: `<64 lowercase hex characters>`
 - Body SHA-256: `<64 lowercase hex characters>`
 
 ## Summary
@@ -231,15 +244,17 @@ Load `<plugin-root>/templates/comment-update.md`. Render:
 
 Replace the whole `[comment](<comment-url>)|none` placeholder with either a link to the final source
 comment in the reviewed contiguous prefix or the exact word `none`. The source link must match the
-current host, repository, issue, and positive comment ID. The body hash covers the exact verified
-UTF-8 GitHub issue body after update. The parser reads only the fixed heading and three metadata
-bullets. Select checkpoint state only from `OWNER`, `MEMBER`, or `COLLABORATOR` authors.
+current host, repository, issue, and positive comment ID. Copy the source item's parser-provided
+`prefix_sha256`; use `empty_prefix_sha256` only with a valid `none` boundary. The body hash covers the
+exact verified UTF-8 GitHub issue body after update. The parser reads only the fixed heading and four
+metadata bullets. Select checkpoint state only from `OWNER`, `MEMBER`, or `COLLABORATOR` authors.
 
 The latest trusted update-shaped comment is authoritative only when it is valid, its body hash
-matches the current issue, and its non-`none` source is an earlier ordinary comment in the same fully
-paginated snapshot. No comment at or before the source may have been edited at or after marker
-creation. Otherwise incremental reading safely returns all ordinary comments with a warning. Update
-comments never authorize issue mutation and never affect implementation or PR state.
+matches the current issue and current rolling prefix, and its non-`none` source is an earlier ordinary
+comment in the same fully paginated snapshot. No comment at or before the source may have been edited
+at or after marker creation. Otherwise incremental reading safely returns all ordinary comments with
+a warning. Update comments never authorize issue mutation and never affect implementation or PR
+state.
 
 ## Pull Request
 

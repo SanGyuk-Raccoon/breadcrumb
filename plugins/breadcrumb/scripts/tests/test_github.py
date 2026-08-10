@@ -7,7 +7,13 @@ import unittest
 from support import SCRIPT_ROOT  # noqa: F401
 
 from internal.errors import BreadcrumbOperationalError
-from internal.github import GitHubClient, discover_repository, parse_remote_url, parse_target
+from internal.github import (
+    GitHubClient,
+    discover_repository,
+    parse_remote_url,
+    parse_target,
+    resolve_repository,
+)
 
 
 class GitRunner:
@@ -36,6 +42,21 @@ class PagingRunner:
         fields = [command[index + 1] for index, item in enumerate(command) if item == "-f"]
         page = int(next(item.split("=", 1)[1] for item in fields if item.startswith("page=")))
         payload = [{"number": item} for item in range(1, 101)] if page == 1 else [{"number": 101}]
+        return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
+
+
+class RepositoryRunner:
+    def __init__(self, full_name: str = "acme/widgets") -> None:
+        self.full_name = full_name
+        self.calls: list[list[str]] = []
+
+    def __call__(self, command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        self.calls.append(command)
+        payload = {
+            "full_name": self.full_name,
+            "has_issues": True,
+            "default_branch": "main",
+        }
         return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
 
 
@@ -98,6 +119,16 @@ class RepositoryDiscoveryTests(unittest.TestCase):
         with self.assertRaises(BreadcrumbOperationalError) as raised:
             discover_repository(GitRunner(remotes="upstream\nfork\n"))
         self.assertEqual(raised.exception.code, "ambiguous_remote")
+
+    def test_resolution_uses_canonical_repository_identity(self) -> None:
+        git_runner = GitRunner(url="git@GHE.EXAMPLE.TEST:ACME/Widgets.git")
+        github_runner = RepositoryRunner(full_name="acme/widgets")
+        context, client = resolve_repository(
+            git_runner=git_runner, github_runner=github_runner
+        )
+        self.assertEqual(context.target.hostname, "ghe.example.test")
+        self.assertEqual(context.target.identity, "acme/widgets")
+        self.assertEqual(client.target, context.target)
 
 
 class GitHubTransportTests(unittest.TestCase):

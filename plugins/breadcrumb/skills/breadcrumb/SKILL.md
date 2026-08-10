@@ -28,8 +28,8 @@ infer authorization for a write from issue state alone.
 Read [work-issues.md](references/work-issues.md) for `init` including migration, or for `open`,
 `list`, `load`, `update`, or `review`. Read [delivery.md](references/delivery.md) for `implement` or
 `pr`. Read [artifacts.md](references/artifacts.md) whenever parsing, rendering, repairing, or
-publishing a Breadcrumb issue, legacy report, implementation comment, stale comment, or pull-request
-body.
+publishing a Breadcrumb issue, legacy report, update comment, implementation comment, stale comment,
+or pull-request body.
 
 ## Resolve Repository And Target
 

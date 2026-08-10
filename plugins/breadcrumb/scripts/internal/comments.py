@@ -32,6 +32,9 @@ _APPLIED_THROUGH_LINE_RE = re.compile(
     r"^- Applied Through: \[comment\]\((https://[^\s()]+/issues/([1-9][0-9]*)"
     r"#issuecomment-([1-9][0-9]*))\)$"
 )
+_COMMENT_PREFIX_SHA256_LINE_RE = re.compile(
+    r"^- Comment Prefix SHA-256: `([0-9a-f]{64})`$"
+)
 _BODY_SHA256_LINE_RE = re.compile(r"^- Body SHA-256: `([0-9a-f]{64})`$")
 
 
@@ -63,6 +66,7 @@ class CommentResult:
 class UpdateArtifact:
     applied_through_id: int | None
     applied_through_url: str | None
+    comment_prefix_sha256: str
     body_sha256: str
 
 
@@ -104,9 +108,9 @@ def _validate_common(
         return _invalid("Verified Commit must be a full lowercase Git object ID")
     if repository_url is not None:
         base = repository_url.rstrip("/")
-        if branch_url != f"{base}/tree/{branch}":
+        if branch_url.casefold() != f"{base}/tree/{branch}".casefold():
             return _invalid("Branch link does not match its branch")
-        if commit_url != f"{base}/commit/{commit}":
+        if commit_url.casefold() != f"{base}/commit/{commit}".casefold():
             return _invalid("Verified Commit link does not match its commit")
     return branch, branch_url, commit, commit_url
 
@@ -200,7 +204,7 @@ def parse_update_comment(
     lines = _metadata_lines(body)
     if not lines or lines[0] != UPDATE_HEADING:
         return UpdateResult("not-breadcrumb")
-    if len(lines) < 4:
+    if len(lines) < 5:
         return _invalid_update("update comment metadata is incomplete")
     if lines[1] != "- Schema Version: 1":
         return _invalid_update("update comment Schema Version must be 1")
@@ -220,10 +224,13 @@ def parse_update_comment(
                 f"{repository_url.rstrip('/')}/issues/{expected_issue}"
                 f"#issuecomment-{applied_through_id}"
             )
-            if applied_through_url != expected_url:
+            if applied_through_url.casefold() != expected_url.casefold():
                 return _invalid_update("Applied Through does not match the repository")
 
-    body_match = _BODY_SHA256_LINE_RE.fullmatch(lines[3])
+    prefix_match = _COMMENT_PREFIX_SHA256_LINE_RE.fullmatch(lines[3])
+    if prefix_match is None:
+        return _invalid_update("Comment Prefix SHA-256 metadata is malformed")
+    body_match = _BODY_SHA256_LINE_RE.fullmatch(lines[4])
     if body_match is None:
         return _invalid_update("Body SHA-256 metadata is malformed")
     return UpdateResult(
@@ -231,6 +238,7 @@ def parse_update_comment(
         artifact=UpdateArtifact(
             applied_through_id=applied_through_id,
             applied_through_url=applied_through_url,
+            comment_prefix_sha256=prefix_match.group(1),
             body_sha256=body_match.group(1),
         ),
     )

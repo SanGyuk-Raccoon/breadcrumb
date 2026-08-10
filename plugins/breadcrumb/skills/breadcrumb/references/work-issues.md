@@ -166,7 +166,7 @@ state only where it affects that operation.
    across a contiguous prefix whose comments are reflected in the body, explicitly rejected, or
    recorded as irrelevant. Stop the boundary before any unresolved or unreviewed comment even when
    a later comment is actionable. Preserve each prefix item's ID, URL, creation and update time, and
-   exact body for pre-POST revalidation.
+   exact body and parser-provided `prefix_sha256` for pre-POST revalidation.
 3. Reflect each completed Todo conclusion and source comment URL in the relevant narrative section
    before checking it. Preserve its Decision Brief and add the final Decision and rationale. Give
    new or rewritten Todo stable unused identifiers and complete Decision Briefs. Append newly
@@ -189,14 +189,17 @@ state only where it affects that operation.
    `in-progress`.
 8. After the final body PATCH or verified no-op conclusion and any required stale comment succeed,
    GET the issue and require the exact final body. Compute its UTF-8 SHA-256, render the fixed
-   `comment-update.md`, and set `Applied Through` to the last comment in the reviewed contiguous
-   prefix or `none` when no ordinary comment exists. Summarize applied, rejected, and irrelevant
-   inputs without copying unnecessary comment content.
+   `comment-update.md`, set `Applied Through` to the last comment in the reviewed contiguous prefix,
+   and copy that item's `prefix_sha256` into `Comment Prefix SHA-256`. Use `none` together with
+   `empty_prefix_sha256` only when no ordinary comment exists. Summarize applied, rejected, and
+   irrelevant inputs without copying unnecessary comment content.
 9. Revalidate the repository, issue, exact body hash, every reviewed prefix comment's identity,
-   timestamps and body, selected source comment, and comment write capability immediately before
-   POST. Search for an existing trusted update comment with the same body hash and boundary; reuse it
-   instead of duplicating it. Otherwise POST exactly one structured comment and verify its positive
-   ID, URL, exact body, target, and trusted provenance.
+   timestamps, body and rolling prefix digest, selected source comment, and comment write capability
+   immediately before POST. Rerun incremental inspect, require the selected item's current
+   `prefix_sha256` to match, and use that revalidated digest in the marker. Search for an existing
+   trusted update comment with the same body hash, boundary, and prefix digest; reuse it instead of
+   duplicating it. Otherwise POST exactly one structured comment and verify its positive ID, URL,
+   exact body, target, and trusted provenance.
 10. When neither the body nor the reviewed comment boundary changes, report a no-op and post no
     marker. If a body PATCH succeeds but marker creation fails or is uncertain, preserve the body,
     do not retry blindly, report partial completion, and leave the earlier checkpoint in place so a

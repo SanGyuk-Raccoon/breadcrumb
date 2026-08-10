@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal, Mapping, Sequence
 
 from . import (
@@ -33,6 +35,9 @@ class ProjectionError:
 
 
 CommentMode = Literal["incremental", "all"]
+_COMMENT_PREFIX_DOMAIN = b"Breadcrumb Comment Prefix v1\0"
+EMPTY_COMMENT_PREFIX_SHA256 = hashlib.sha256(_COMMENT_PREFIX_DOMAIN).hexdigest()
+_GITHUB_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 @dataclass(frozen=True)
@@ -88,6 +93,14 @@ def _label_names(issue: Mapping[str, Any]) -> set[str]:
     return names
 
 
+def _valid_github_timestamp(value: str) -> bool:
+    try:
+        parsed = datetime.strptime(value, _GITHUB_TIMESTAMP_FORMAT)
+    except ValueError:
+        return False
+    return parsed.strftime(_GITHUB_TIMESTAMP_FORMAT) == value
+
+
 def _normalize_comment(
     raw: Mapping[str, Any],
     *,
@@ -107,6 +120,14 @@ def _normalize_comment(
         raise BreadcrumbOperationalError(
             "invalid_github_response", "an issue comment contains malformed metadata"
         )
+    if (
+        not _valid_github_timestamp(created_at)
+        or not _valid_github_timestamp(updated_at)
+        or updated_at < created_at
+    ):
+        raise BreadcrumbOperationalError(
+            "invalid_github_response", "an issue comment contains malformed timestamps"
+        )
     if not isinstance(body, str):
         raise BreadcrumbOperationalError(
             "invalid_github_response", "an issue comment body is malformed"
@@ -114,13 +135,18 @@ def _normalize_comment(
     expected_url = (
         f"{repository_url.rstrip('/')}/issues/{issue_number}#issuecomment-{identifier}"
     )
-    if url != expected_url:
+    if url.casefold() != expected_url.casefold():
         raise BreadcrumbOperationalError(
             "invalid_github_response", "an issue comment URL does not match its identity"
         )
     user = raw.get("user")
-    author = user.get("login") if isinstance(user, dict) else None
-    if author is not None and not isinstance(author, str):
+    if user is None:
+        author = None
+    elif isinstance(user, dict):
+        author = user.get("login")
+    else:
+        author = None
+    if user is not None and (not isinstance(author, str) or not author):
         raise BreadcrumbOperationalError(
             "invalid_github_response", "an issue comment author is malformed"
         )
@@ -133,17 +159,20 @@ def _comment_snapshot(
     issue_number: int,
     repository_url: str,
 ) -> list[_Comment]:
-    return sorted(
-        (
-            _normalize_comment(
-                comment,
-                issue_number=issue_number,
-                repository_url=repository_url,
-            )
-            for comment in raw_comments
-        ),
-        key=lambda comment: comment.key,
-    )
+    normalized = [
+        _normalize_comment(
+            comment,
+            issue_number=issue_number,
+            repository_url=repository_url,
+        )
+        for comment in raw_comments
+    ]
+    identifiers = [comment.identifier for comment in normalized]
+    if len(set(identifiers)) != len(identifiers):
+        raise BreadcrumbOperationalError(
+            "invalid_github_response", "GitHub returned duplicate issue comments"
+        )
+    return sorted(normalized, key=lambda comment: comment.key)
 
 
 def _latest_implementation(
@@ -187,6 +216,31 @@ def _body_sha256(body: object) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _extend_comment_prefix(previous: str, comment: _Comment) -> str:
+    payload = json.dumps(
+        comment.as_item(),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(bytes.fromhex(previous) + b"\0" + payload).hexdigest()
+
+
+def _comment_prefixes(comments: Sequence[_Comment]) -> dict[int, str]:
+    current = EMPTY_COMMENT_PREFIX_SHA256
+    prefixes: dict[int, str] = {}
+    for comment in comments:
+        current = _extend_comment_prefix(current, comment)
+        prefixes[comment.identifier] = current
+    return prefixes
+
+
+def _ordinary_item(comment: _Comment, prefix_sha256: str) -> dict[str, object]:
+    item = comment.as_item()
+    item["prefix_sha256"] = prefix_sha256
+    return item
+
+
 def _update_item(comment: _Comment, artifact: UpdateArtifact) -> dict[str, object]:
     return {
         "comment_id": comment.identifier,
@@ -195,6 +249,7 @@ def _update_item(comment: _Comment, artifact: UpdateArtifact) -> dict[str, objec
         "updated_at": comment.updated_at,
         "applied_through_id": artifact.applied_through_id,
         "applied_through_url": artifact.applied_through_url,
+        "comment_prefix_sha256": artifact.comment_prefix_sha256,
         "body_sha256": artifact.body_sha256,
     }
 
@@ -249,6 +304,7 @@ def _comment_projection(
     checkpoint: dict[str, object] | None = None
     boundary: tuple[str, int] | None = None
     fallback = False
+    prefixes = _comment_prefixes(ordinary)
     if trusted_update_candidates:
         marker, result = max(trusted_update_candidates, key=lambda item: item[0].key)
         artifact = result.artifact
@@ -271,15 +327,17 @@ def _comment_projection(
         else:
             source: _Comment | None = None
             if artifact.applied_through_id is not None:
-                source = next(
-                    (
-                        comment
-                        for comment in ordinary
-                        if comment.identifier == artifact.applied_through_id
-                        and comment.url == artifact.applied_through_url
-                    ),
-                    None,
-                )
+                source_url = artifact.applied_through_url
+                if source_url is not None:
+                    source = next(
+                        (
+                            comment
+                            for comment in ordinary
+                            if comment.identifier == artifact.applied_through_id
+                            and comment.url.casefold() == source_url.casefold()
+                        ),
+                        None,
+                    )
                 if source is None or source.key >= marker.key:
                     fallback = True
                     warnings.append(
@@ -290,30 +348,62 @@ def _comment_projection(
                     )
                 else:
                     boundary = source.key
-                    edited = next(
-                        (
-                            comment
-                            for comment in ordinary
-                            if comment.key <= boundary
-                            and comment.updated_at >= marker.created_at
-                        ),
-                        None,
-                    )
-                    if edited is not None:
+                    if artifact.comment_prefix_sha256 != prefixes[source.identifier]:
                         fallback = True
                         boundary = None
                         warnings.append(
                             _warning(
-                                "edited_comment_before_checkpoint",
-                                f"ordinary comment {edited.url} was edited at or after the selected Breadcrumb Update checkpoint",
+                                "changed_comment_prefix",
+                                f"Breadcrumb Update comment {marker.url} does not match the current ordinary comment prefix",
                             )
                         )
+                    else:
+                        edited = next(
+                            (
+                                comment
+                                for comment in ordinary
+                                if comment.key <= boundary
+                                and comment.updated_at >= marker.created_at
+                            ),
+                            None,
+                        )
+                        if edited is not None:
+                            fallback = True
+                            boundary = None
+                            warnings.append(
+                                _warning(
+                                    "edited_comment_before_checkpoint",
+                                    f"ordinary comment {edited.url} was edited at or after the selected Breadcrumb Update checkpoint",
+                                )
+                            )
+            else:
+                earlier = next(
+                    (comment for comment in ordinary if comment.key < marker.key),
+                    None,
+                )
+                if earlier is not None:
+                    fallback = True
+                    warnings.append(
+                        _warning(
+                            "invalid_update_checkpoint",
+                            f"Breadcrumb Update comment {marker.url} uses none despite an earlier ordinary comment",
+                        )
+                    )
+                elif artifact.comment_prefix_sha256 != EMPTY_COMMENT_PREFIX_SHA256:
+                    fallback = True
+                    warnings.append(
+                        _warning(
+                            "changed_comment_prefix",
+                            f"Breadcrumb Update comment {marker.url} does not match the empty ordinary comment prefix",
+                        )
+                    )
             if not fallback:
                 checkpoint = {
                     "comment_id": marker.identifier,
                     "comment_url": marker.url,
                     "applied_through_id": artifact.applied_through_id,
                     "applied_through_url": artifact.applied_through_url,
+                    "comment_prefix_sha256": artifact.comment_prefix_sha256,
                 }
 
     effective_mode: CommentMode = "all" if mode == "all" or fallback else "incremental"
@@ -325,8 +415,11 @@ def _comment_projection(
         "requested_mode": mode,
         "effective_mode": effective_mode,
         "body_sha256": body_sha256,
+        "empty_prefix_sha256": EMPTY_COMMENT_PREFIX_SHA256,
         "checkpoint": checkpoint,
-        "items": [comment.as_item() for comment in selected],
+        "items": [
+            _ordinary_item(comment, prefixes[comment.identifier]) for comment in selected
+        ],
         "updates": [
             _update_item(comment, artifact)
             for comment, artifact in sorted(valid_updates, key=lambda item: item[0].key)
