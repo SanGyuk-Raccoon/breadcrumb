@@ -1,11 +1,69 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import unittest
 
 from support import FakeClient, copied_fixture
 
 from internal.projection import inspect_issue, list_issues
+
+
+def ordinary_comment(
+    identifier: int,
+    created_at: str,
+    body: str,
+    *,
+    association: str = "MEMBER",
+    updated_at: str | None = None,
+) -> dict[str, object]:
+    return {
+        "id": identifier,
+        "created_at": created_at,
+        "updated_at": updated_at or created_at,
+        "author_association": association,
+        "user": {"login": "decision-maker"},
+        "html_url": f"https://ghe.example.test/acme/widgets/issues/3#issuecomment-{identifier}",
+        "body": body,
+    }
+
+
+def update_comment(
+    identifier: int,
+    created_at: str,
+    body_sha256: str,
+    *,
+    applied_through: int | None,
+    association: str = "MEMBER",
+    malformed: bool = False,
+) -> dict[str, object]:
+    applied = (
+        "none"
+        if applied_through is None
+        else (
+            "[comment](https://ghe.example.test/acme/widgets/issues/3"
+            f"#issuecomment-{applied_through})"
+        )
+    )
+    schema = "2" if malformed else "1"
+    return ordinary_comment(
+        identifier,
+        created_at,
+        "\n".join(
+            [
+                "## Breadcrumb Update",
+                "",
+                f"- Schema Version: {schema}",
+                f"- Applied Through: {applied}",
+                f"- Body SHA-256: `{body_sha256}`",
+                "",
+                "## Summary",
+                "",
+                "Applied reviewed decisions.",
+            ]
+        ),
+        association=association,
+    )
 
 
 class ProjectionTests(unittest.TestCase):
@@ -15,10 +73,12 @@ class ProjectionTests(unittest.TestCase):
         self.pulls = copied_fixture("pull_requests.json")
 
     def test_absent_artifacts_are_null(self) -> None:
-        result = inspect_issue(FakeClient([self.issues[2]]), 3)["issue"]
-        self.assertTrue(result["valid"])
-        self.assertIsNone(result["implementation"])
-        self.assertIsNone(result["pull_request"])
+        projection = inspect_issue(FakeClient([self.issues[2]]), 3)
+        self.assertNotIn("comments", projection)
+        issue = projection["issue"]
+        self.assertTrue(issue["valid"])
+        self.assertIsNone(issue["implementation"])
+        self.assertIsNone(issue["pull_request"])
 
     def test_latest_valid_comment_controls_current_or_stale(self) -> None:
         stale = inspect_issue(
@@ -37,6 +97,7 @@ class ProjectionTests(unittest.TestCase):
         active = copy.deepcopy(self.issues[1])
         comment = copy.deepcopy(self.comments[0])
         comment["body"] = comment["body"].replace("breadcrumb/3-", "breadcrumb/2-")
+        comment["html_url"] = comment["html_url"].replace("/issues/3#", "/issues/2#")
         result = inspect_issue(FakeClient([active], comments={2: [comment]}), 2)["issue"]
         self.assertEqual(result["implementation"]["state"], "stale")
 
@@ -133,6 +194,234 @@ class ProjectionTests(unittest.TestCase):
         self.assertIn(
             "missing_breadcrumb_label", {item["code"] for item in result["errors"]}
         )
+
+    def test_incremental_and_all_comment_modes_share_one_snapshot(self) -> None:
+        issue = self.issues[2]
+        body_hash = hashlib.sha256(issue["body"].encode("utf-8")).hexdigest()
+        comments = [
+            ordinary_comment(200, "2026-01-04T00:00:00Z", "T1: A"),
+            ordinary_comment(201, "2026-01-05T00:00:00Z", "T2: B"),
+            update_comment(
+                202,
+                "2026-01-06T00:00:00Z",
+                body_hash,
+                applied_through=200,
+            ),
+        ]
+        incremental_client = FakeClient([issue], comments={3: comments})
+        incremental = inspect_issue(
+            incremental_client, 3, comment_mode="incremental"
+        )
+        self.assertEqual(incremental_client.comment_calls, [3])
+        self.assertEqual(incremental["comments"]["requested_mode"], "incremental")
+        self.assertEqual(incremental["comments"]["effective_mode"], "incremental")
+        self.assertEqual(incremental["comments"]["body_sha256"], body_hash)
+        self.assertEqual(
+            [item["id"] for item in incremental["comments"]["items"]], [201]
+        )
+        self.assertEqual(
+            incremental["comments"]["items"][0]["updated_at"],
+            "2026-01-05T00:00:00Z",
+        )
+        self.assertEqual(
+            incremental["comments"]["checkpoint"]["applied_through_id"], 200
+        )
+        self.assertEqual(len(incremental["comments"]["updates"]), 1)
+
+        all_client = FakeClient([issue], comments={3: comments})
+        complete = inspect_issue(all_client, 3, comment_mode="all")
+        self.assertEqual(
+            [item["id"] for item in complete["comments"]["items"]], [200, 201]
+        )
+        self.assertEqual(complete["comments"]["effective_mode"], "all")
+
+    def test_implementation_and_comment_projection_reuse_the_same_snapshot(self) -> None:
+        issue = self.issues[2]
+        body_hash = hashlib.sha256(issue["body"].encode("utf-8")).hexdigest()
+        source = ordinary_comment(205, "2026-01-04T00:00:00Z", "T1: A")
+        marker = update_comment(
+            206,
+            "2026-01-05T00:00:00Z",
+            body_hash,
+            applied_through=205,
+        )
+        implementation = copy.deepcopy(self.comments[0])
+        implementation["created_at"] = "2026-01-03T00:00:00Z"
+        client = FakeClient(
+            [issue], comments={3: [implementation, source, marker]}
+        )
+        result = inspect_issue(client, 3, comment_mode="incremental")
+        self.assertEqual(client.comment_calls, [3])
+        self.assertEqual(result["issue"]["implementation"]["state"], "current")
+        self.assertEqual(result["comments"]["items"], [])
+
+    def test_comment_order_uses_id_when_timestamps_match(self) -> None:
+        issue = self.issues[2]
+        body_hash = hashlib.sha256(issue["body"].encode("utf-8")).hexdigest()
+        comments = [
+            ordinary_comment(210, "2026-01-04T00:00:00Z", "T1: A"),
+            ordinary_comment(211, "2026-01-04T00:00:00Z", "T2: B"),
+            update_comment(
+                212,
+                "2026-01-05T00:00:00Z",
+                body_hash,
+                applied_through=210,
+            ),
+        ]
+        result = inspect_issue(
+            FakeClient([issue], comments={3: comments}),
+            3,
+            comment_mode="incremental",
+        )
+        self.assertEqual([item["id"] for item in result["comments"]["items"]], [211])
+
+    def test_stale_checkpoint_falls_back_to_all_without_losing_comments(self) -> None:
+        issue = self.issues[2]
+        comments = [
+            ordinary_comment(220, "2026-01-04T00:00:00Z", "T1: A"),
+            update_comment(
+                221,
+                "2026-01-05T00:00:00Z",
+                "b" * 64,
+                applied_through=220,
+            ),
+        ]
+        result = inspect_issue(
+            FakeClient([issue], comments={3: comments}),
+            3,
+            comment_mode="incremental",
+        )
+        projection = result["comments"]
+        self.assertEqual(projection["effective_mode"], "all")
+        self.assertIsNone(projection["checkpoint"])
+        self.assertEqual([item["id"] for item in projection["items"]], [220])
+        self.assertIn(
+            "stale_update_checkpoint",
+            {warning["code"] for warning in projection["warnings"]},
+        )
+
+    def test_latest_trusted_malformed_marker_forces_safe_fallback(self) -> None:
+        issue = self.issues[2]
+        body_hash = hashlib.sha256(issue["body"].encode("utf-8")).hexdigest()
+        comments = [
+            ordinary_comment(230, "2026-01-04T00:00:00Z", "T1: A"),
+            update_comment(
+                231,
+                "2026-01-05T00:00:00Z",
+                body_hash,
+                applied_through=230,
+            ),
+            update_comment(
+                232,
+                "2026-01-06T00:00:00Z",
+                body_hash,
+                applied_through=230,
+                malformed=True,
+            ),
+        ]
+        result = inspect_issue(
+            FakeClient([issue], comments={3: comments}),
+            3,
+            comment_mode="incremental",
+        )["comments"]
+        self.assertEqual(result["effective_mode"], "all")
+        self.assertIn(
+            "invalid_update_checkpoint",
+            {warning["code"] for warning in result["warnings"]},
+        )
+
+    def test_untrusted_marker_does_not_advance_the_checkpoint(self) -> None:
+        issue = self.issues[2]
+        body_hash = hashlib.sha256(issue["body"].encode("utf-8")).hexdigest()
+        comments = [
+            ordinary_comment(240, "2026-01-04T00:00:00Z", "T1: A"),
+            update_comment(
+                241,
+                "2026-01-05T00:00:00Z",
+                body_hash,
+                applied_through=240,
+                association="NONE",
+            ),
+        ]
+        result = inspect_issue(
+            FakeClient([issue], comments={3: comments}),
+            3,
+            comment_mode="incremental",
+        )["comments"]
+        self.assertIsNone(result["checkpoint"])
+        self.assertEqual([item["id"] for item in result["items"]], [240])
+        self.assertIn(
+            "untrusted_update_comment",
+            {warning["code"] for warning in result["warnings"]},
+        )
+
+    def test_out_of_order_applied_comment_forces_safe_fallback(self) -> None:
+        issue = self.issues[2]
+        body_hash = hashlib.sha256(issue["body"].encode("utf-8")).hexdigest()
+        comments = [
+            update_comment(
+                250,
+                "2026-01-04T00:00:00Z",
+                body_hash,
+                applied_through=251,
+            ),
+            ordinary_comment(251, "2026-01-05T00:00:00Z", "T1: A"),
+        ]
+        result = inspect_issue(
+            FakeClient([issue], comments={3: comments}),
+            3,
+            comment_mode="incremental",
+        )["comments"]
+        self.assertEqual(result["effective_mode"], "all")
+        self.assertEqual([item["id"] for item in result["items"]], [251])
+        self.assertIn(
+            "invalid_update_checkpoint",
+            {warning["code"] for warning in result["warnings"]},
+        )
+
+    def test_comment_edited_after_checkpoint_forces_safe_fallback(self) -> None:
+        issue = self.issues[2]
+        body_hash = hashlib.sha256(issue["body"].encode("utf-8")).hexdigest()
+        comments = [
+            ordinary_comment(
+                255,
+                "2026-01-04T00:00:00Z",
+                "T1: changed answer",
+                updated_at="2026-01-06T00:00:00Z",
+            ),
+            update_comment(
+                256,
+                "2026-01-05T00:00:00Z",
+                body_hash,
+                applied_through=255,
+            ),
+        ]
+        result = inspect_issue(
+            FakeClient([issue], comments={3: comments}),
+            3,
+            comment_mode="incremental",
+        )["comments"]
+        self.assertEqual(result["effective_mode"], "all")
+        self.assertEqual([item["id"] for item in result["items"]], [255])
+        self.assertIn(
+            "edited_comment_before_checkpoint",
+            {warning["code"] for warning in result["warnings"]},
+        )
+
+    def test_missing_checkpoint_returns_all_comments_without_warning(self) -> None:
+        issue = self.issues[2]
+        result = inspect_issue(
+            FakeClient(
+                [issue],
+                comments={3: [ordinary_comment(260, "2026-01-04T00:00:00Z", "T1: A")]},
+            ),
+            3,
+            comment_mode="incremental",
+        )["comments"]
+        self.assertEqual(result["effective_mode"], "incremental")
+        self.assertIsNone(result["checkpoint"])
+        self.assertEqual([item["id"] for item in result["items"]], [260])
+        self.assertEqual(result["warnings"], [])
 
 
 if __name__ == "__main__":

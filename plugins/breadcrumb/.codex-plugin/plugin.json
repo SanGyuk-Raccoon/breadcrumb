@@ -1,15 +1,15 @@
 {
   "name": "breadcrumb",
-  "version": "0.2.0+codex.20260809122041",
-  "description": "Durable GitHub work issues and privacy-minimized product reporting",
+  "version": "0.2.0+codex.20260810125817",
+  "description": "Durable GitHub work issues, asynchronous decisions, and product reporting",
   "author": {
     "name": "Breadcrumb contributors"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Breadcrumb",
-    "shortDescription": "Durable GitHub work and product reporting.",
-    "longDescription": "Plan, implement, verify, and publish cohesive work through durable GitHub issues, and capture privacy-minimized Breadcrumb product reports as backlog work.",
+    "shortDescription": "Durable GitHub work, decisions, and product reporting.",
+    "longDescription": "Plan, decide asynchronously through issue comments, implement, verify, and publish cohesive work through durable GitHub issues, and capture privacy-minimized Breadcrumb product reports as backlog work.",
     "developerName": "Breadcrumb contributors",
     "category": "Productivity",
     "capabilities": [
@@ -21,6 +21,7 @@
       "Initialize this repository for Breadcrumb.",
       "Capture this work in one Breadcrumb issue.",
       "Continue the current Breadcrumb work issue.",
+      "Load new decisions from the current issue comments.",
       "Report a Breadcrumb bug or feature request from this conversation."
     ]
   }

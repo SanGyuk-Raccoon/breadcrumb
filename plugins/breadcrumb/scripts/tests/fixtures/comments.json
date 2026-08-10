@@ -2,6 +2,7 @@
   {
     "id": 100,
     "created_at": "2026-01-01T00:00:00Z",
+    "updated_at": "2026-01-01T00:00:00Z",
     "author_association": "MEMBER",
     "html_url": "https://ghe.example.test/acme/widgets/issues/3#issuecomment-100",
     "body": "## Breadcrumb Implementation\n\n- Schema Version: 1\n- Branch: [`breadcrumb/3-implement-retry-policy`](https://ghe.example.test/acme/widgets/tree/breadcrumb/3-implement-retry-policy)\n- Verified Commit: [`0123456789abcdef0123456789abcdef01234567`](https://ghe.example.test/acme/widgets/commit/0123456789abcdef0123456789abcdef01234567)\n- Verification: passed\n\n## Summary\n\nImplemented bounded retries.\n\n## Verification Report\n\nUnit tests passed."
@@ -9,6 +10,7 @@
   {
     "id": 101,
     "created_at": "2026-01-02T00:00:00Z",
+    "updated_at": "2026-01-02T00:00:00Z",
     "author_association": "MEMBER",
     "html_url": "https://ghe.example.test/acme/widgets/issues/3#issuecomment-101",
     "body": "## Breadcrumb Implementation Stale\n\n- Schema Version: 1\n- Previous Implementation: [comment](https://ghe.example.test/acme/widgets/issues/3#issuecomment-100)\n- Branch: [`breadcrumb/3-implement-retry-policy`](https://ghe.example.test/acme/widgets/tree/breadcrumb/3-implement-retry-policy)\n- Verified Commit: [`0123456789abcdef0123456789abcdef01234567`](https://ghe.example.test/acme/widgets/commit/0123456789abcdef0123456789abcdef01234567)\n- Reason: Retry requirements changed."
@@ -16,6 +18,7 @@
   {
     "id": 102,
     "created_at": "2026-01-03T00:00:00Z",
+    "updated_at": "2026-01-03T00:00:00Z",
     "author_association": "MEMBER",
     "html_url": "https://ghe.example.test/acme/widgets/issues/3#issuecomment-102",
     "body": "## Breadcrumb Implementation\n\n- Schema Version: 1\n- Branch: [`breadcrumb/3-implement-retry-policy`](https://ghe.example.test/acme/widgets/tree/breadcrumb/3-implement-retry-policy)\n- Verified Commit: [`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`](https://ghe.example.test/acme/widgets/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)\n- Verification: pending\n\n## Summary\n\nUpdated bounded retries.\n\n## Verification Report\n\nCI remains pending."

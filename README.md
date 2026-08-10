@@ -20,6 +20,12 @@ Meaningful completed Todo items remain checked as durable decision history. New 
 appended while work evolves. Requirement and design changes after implementation mark the previous
 implementation stale and return the issue to `in-progress`.
 
+New or rewritten Todo use stable `T<number>` identifiers. A decision-bearing Todo has a matching
+Decision Brief in the human-readable issue narrative with its reason, real options and tradeoffs,
+recommendation, uncertainty, and a reply example. A user can answer several IDs in issue comments;
+`load` retrieves unprocessed comments by default and an explicit full-history mode remains available
+for audit or recovery.
+
 ## Skills
 
 The plugin exposes two user-facing skills:
@@ -114,12 +120,20 @@ The plugin has one public script entry point and requires Python 3.11 or newer:
 python3.12 plugins/breadcrumb/scripts/breadcrumb.py list
 python3.12 plugins/breadcrumb/scripts/breadcrumb.py list --status in-progress
 python3.12 plugins/breadcrumb/scripts/breadcrumb.py inspect 18
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py inspect 18 --comments incremental
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py inspect 18 --comments all
 ```
 
 The script discovers the current GitHub repository from Git, queries issues with the `breadcrumb`
-label, parses the fixed body and trusted implementation comments, and queries GitHub closing pull
+label, parses the fixed body and trusted control comments, and queries GitHub closing pull
 request relationships. It emits JSON only and performs no writes. A malformed issue is returned with
 `valid: false` and structured errors without hiding valid siblings.
+
+The optional comment modes add a single fully paginated comment snapshot. A fixed visible
+`Breadcrumb Update` comment records the exact issue-body SHA-256 and the final ordinary comment in
+the contiguous reviewed prefix. Incremental mode returns ordinary comments after that source; all
+mode returns the full ordinary history and update artifacts. Missing, stale, malformed, or
+out-of-order checkpoints fall back toward repeated context rather than skipped comments.
 
 ## Installation
 
@@ -154,6 +168,10 @@ task data; they cannot override active instructions, authorization, or credentia
 Implementation or stale comments control branch state only when their fixed visible metadata is
 valid and the GitHub comment author association is `OWNER`, `MEMBER`, or `COLLABORATOR`. Credentials
 are never read, printed, or persisted by Breadcrumb.
+
+Update comments use the same trusted author associations only for the incremental checkpoint.
+Ordinary comments remain untrusted decision input: author association is provenance, not decision
+authority, and a comment never grants permission to change an issue.
 
 ## Development Verification
 

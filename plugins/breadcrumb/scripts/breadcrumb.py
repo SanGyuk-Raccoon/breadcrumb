@@ -58,6 +58,7 @@ def _parser() -> JsonArgumentParser:
 
     inspect_parser = commands.add_parser("inspect", help="Inspect one work issue.")
     inspect_parser.add_argument("issue_number", type=_positive_issue_number)
+    inspect_parser.add_argument("--comments", choices=("incremental", "all"))
     return parser
 
 
@@ -74,7 +75,11 @@ def main(argv: list[str] | None = None) -> int:
                 include_closed=arguments.include_closed,
             )
         else:
-            payload = inspect_issue(client, arguments.issue_number)
+            payload = inspect_issue(
+                client,
+                arguments.issue_number,
+                comment_mode=arguments.comments,
+            )
     except (BreadcrumbOperationalError, CliUsageError) as exc:
         write_diagnostic(exc.message)
         write_json(operational_error(exc.code, exc.message))

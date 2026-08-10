@@ -10,6 +10,7 @@ the parser.
 - [Parser Projection](#parser-projection)
 - [Implementation Comment](#implementation-comment)
 - [Stale Comment](#stale-comment)
+- [Update Comment](#update-comment)
 - [Pull Request](#pull-request)
 
 ## Work Issue
@@ -30,6 +31,14 @@ Permit blank narrative sections. Permit arbitrary Markdown below the first five 
 level-three or deeper headings for subsections. Do not add another level-two heading. Put only
 Markdown task-list items and blank lines below `Todo`. Preserve meaningful completed work as `[x]`;
 delete only typo or duplicate noise. Mark canceled work `[x]` with a concise reason.
+
+Use durable `T<number>` identifiers for Todo created or rewritten by the current workflow. Never
+reuse an identifier or change its meaning after completion. For a decision-bearing unchecked Todo,
+put a same-ID Decision Brief in the relevant narrative section with level-three or deeper headings.
+Include Why, real Options and tradeoffs, Recommendation with evidence and uncertainty, and a Reply
+example. Preserve the comparison after resolution and add the final Decision, rationale, and source
+comment URL before checking the Todo. This is a human-readable convention, not new parser state;
+schema 1 bodies with older ID-less Todo remain valid.
 
 End the body with exactly:
 
@@ -110,6 +119,63 @@ Return the complete `implementation` or `pull_request` object as `null` when abs
 `present` booleans. Preserve invalid items with structured errors. A status-filtered list still
 surfaces invalid items so corruption is not hidden.
 
+`inspect <number> --comments incremental|all` optionally adds this top-level object without changing
+the default `inspect` or `list` shape:
+
+```json
+{
+  "comments": {
+    "requested_mode": "incremental",
+    "effective_mode": "incremental",
+    "body_sha256": "<64 lowercase hex characters>",
+    "checkpoint": {
+      "comment_id": 205,
+      "comment_url": "https://host/owner/repo/issues/18#issuecomment-205",
+      "applied_through_id": 204,
+      "applied_through_url": "https://host/owner/repo/issues/18#issuecomment-204"
+    },
+    "items": [
+      {
+        "id": 206,
+        "url": "https://host/owner/repo/issues/18#issuecomment-206",
+        "created_at": "2026-01-02T03:04:05Z",
+        "updated_at": "2026-01-02T03:04:05Z",
+        "author": "octocat",
+        "author_association": "MEMBER",
+        "body": "T2: B"
+      }
+    ],
+    "updates": [
+      {
+        "comment_id": 205,
+        "comment_url": "https://host/owner/repo/issues/18#issuecomment-205",
+        "created_at": "2026-01-02T03:05:00Z",
+        "updated_at": "2026-01-02T03:05:00Z",
+        "applied_through_id": 204,
+        "applied_through_url": "https://host/owner/repo/issues/18#issuecomment-204",
+        "body_sha256": "<64 lowercase hex characters>"
+      }
+    ],
+    "warnings": []
+  }
+}
+```
+
+Return `checkpoint: null` when none is usable. `all` returns every ordinary comment. `incremental`
+returns ordinary comments after the selected marker's `Applied Through` source. Control-shaped
+implementation, stale, and update comments are excluded from `items`; valid trusted update artifacts
+are listed in `updates`. A missing marker returns all ordinary comments without inventing a cursor.
+A malformed latest trusted marker, current-body hash mismatch, missing source, or out-of-order source
+changes `effective_mode` to `all` and adds a structured warning. Fully paginate and order the single
+comment snapshot by creation time then positive comment ID. If an ordinary comment at or before the
+boundary has `updated_at` equal to or later than the marker's creation time, also fall back to `all`.
+Return the current raw issue body UTF-8 SHA-256 so the caller can detect a concurrent direct body
+read.
+
+`author` is a login string or `null` for a deleted account. Warnings use exact `code` and `message`
+strings. Keep valid trusted update history ordered even when the latest entry cannot serve as the
+current checkpoint.
+
 ## Implementation Comment
 
 Load `<plugin-root>/templates/comment-implementation.md`. Render the first heading and four metadata
@@ -146,6 +212,34 @@ Load `<plugin-root>/templates/comment-implementation-stale.md` and render:
 A later valid implementation comment makes the implementation current again. Independently infer
 an older implementation as stale whenever the issue is `in-progress`, including when stale-comment
 creation partially failed.
+
+## Update Comment
+
+Load `<plugin-root>/templates/comment-update.md`. Render:
+
+```text
+## Breadcrumb Update
+
+- Schema Version: 1
+- Applied Through: [comment](<source-comment-url>)|none
+- Body SHA-256: `<64 lowercase hex characters>`
+
+## Summary
+
+<summary>
+```
+
+Replace the whole `[comment](<comment-url>)|none` placeholder with either a link to the final source
+comment in the reviewed contiguous prefix or the exact word `none`. The source link must match the
+current host, repository, issue, and positive comment ID. The body hash covers the exact verified
+UTF-8 GitHub issue body after update. The parser reads only the fixed heading and three metadata
+bullets. Select checkpoint state only from `OWNER`, `MEMBER`, or `COLLABORATOR` authors.
+
+The latest trusted update-shaped comment is authoritative only when it is valid, its body hash
+matches the current issue, and its non-`none` source is an earlier ordinary comment in the same fully
+paginated snapshot. No comment at or before the source may have been edited at or after marker
+creation. Otherwise incremental reading safely returns all ordinary comments with a warning. Update
+comments never authorize issue mutation and never affect implementation or PR state.
 
 ## Pull Request
 
