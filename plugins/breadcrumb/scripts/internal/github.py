@@ -49,7 +49,7 @@ class RepositoryContext:
 
 
 def parse_target(hostname: str, repository: str) -> RepositoryTarget:
-    host = hostname.strip()
+    host = hostname.strip().lower()
     if not _HOST_RE.fullmatch(host):
         raise BreadcrumbOperationalError(
             "invalid_hostname", "hostname must be a plain host name such as github.com"
@@ -341,4 +341,9 @@ def resolve_repository(
         raise BreadcrumbOperationalError(
             "invalid_github_response", "GitHub repository default branch is missing"
         )
-    return RepositoryContext(root, remote, target, default_branch), client
+    canonical_target = parse_target(target.hostname, full_name)
+    canonical_client = GitHubClient(canonical_target, github_runner)
+    return (
+        RepositoryContext(root, remote, canonical_target, default_branch),
+        canonical_client,
+    )

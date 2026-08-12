@@ -1,4 +1,4 @@
-"""Parse Breadcrumb implementation and stale comments from visible Markdown."""
+"""Parse Breadcrumb control comments from visible Markdown."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from .documents import normalize_markdown
 
 IMPLEMENTATION_HEADING = "## Breadcrumb Implementation"
 STALE_HEADING = "## Breadcrumb Implementation Stale"
+UPDATE_HEADING = "## Breadcrumb Update"
 
 BRANCH_RE = re.compile(r"^breadcrumb/([1-9][0-9]*)-[a-z0-9][a-z0-9-]*$")
 _OBJECT_ID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -27,6 +28,14 @@ _VERIFICATION_LINE_RE = re.compile(
     r"^- Verification: (passed|failed|pending)$"
 )
 _REASON_LINE_RE = re.compile(r"^- Reason: (\S(?:.*\S)?)$")
+_APPLIED_THROUGH_LINE_RE = re.compile(
+    r"^- Applied Through: \[comment\]\((https://[^\s()]+/issues/([1-9][0-9]*)"
+    r"#issuecomment-([1-9][0-9]*))\)$"
+)
+_COMMENT_PREFIX_SHA256_LINE_RE = re.compile(
+    r"^- Comment Prefix SHA-256: `([0-9a-f]{64})`$"
+)
+_BODY_SHA256_LINE_RE = re.compile(r"^- Body SHA-256: `([0-9a-f]{64})`$")
 
 
 def parse_branch(value: str) -> int | None:
@@ -53,8 +62,27 @@ class CommentResult:
     message: str | None = None
 
 
+@dataclass(frozen=True)
+class UpdateArtifact:
+    applied_through_id: int | None
+    applied_through_url: str | None
+    comment_prefix_sha256: str
+    body_sha256: str
+
+
+@dataclass(frozen=True)
+class UpdateResult:
+    outcome: Literal["not-breadcrumb", "valid", "invalid"]
+    artifact: UpdateArtifact | None = None
+    message: str | None = None
+
+
 def _invalid(message: str) -> CommentResult:
     return CommentResult("invalid", message=message)
+
+
+def _invalid_update(message: str) -> UpdateResult:
+    return UpdateResult("invalid", message=message)
 
 
 def _metadata_lines(body: str) -> list[str]:
@@ -80,9 +108,9 @@ def _validate_common(
         return _invalid("Verified Commit must be a full lowercase Git object ID")
     if repository_url is not None:
         base = repository_url.rstrip("/")
-        if branch_url != f"{base}/tree/{branch}":
+        if branch_url.casefold() != f"{base}/tree/{branch}".casefold():
             return _invalid("Branch link does not match its branch")
-        if commit_url != f"{base}/commit/{commit}":
+        if commit_url.casefold() != f"{base}/commit/{commit}".casefold():
             return _invalid("Verified Commit link does not match its commit")
     return branch, branch_url, commit, commit_url
 
@@ -159,5 +187,58 @@ def parse_breadcrumb_comment(
             commit_url,
             previous_comment_url=previous_match.group(1),
             reason=reason_match.group(1),
+        ),
+    )
+
+
+def parse_update_comment(
+    body: object,
+    *,
+    expected_issue: int,
+    repository_url: str | None = None,
+) -> UpdateResult:
+    """Parse only the fixed update heading and metadata bullets."""
+
+    if not isinstance(body, str):
+        return UpdateResult("not-breadcrumb")
+    lines = _metadata_lines(body)
+    if not lines or lines[0] != UPDATE_HEADING:
+        return UpdateResult("not-breadcrumb")
+    if len(lines) < 5:
+        return _invalid_update("update comment metadata is incomplete")
+    if lines[1] != "- Schema Version: 1":
+        return _invalid_update("update comment Schema Version must be 1")
+
+    applied_through_id: int | None = None
+    applied_through_url: str | None = None
+    if lines[2] != "- Applied Through: none":
+        applied_match = _APPLIED_THROUGH_LINE_RE.fullmatch(lines[2])
+        if applied_match is None:
+            return _invalid_update("Applied Through metadata is malformed")
+        applied_through_url, issue_value, comment_value = applied_match.groups()
+        if int(issue_value) != expected_issue:
+            return _invalid_update("Applied Through does not match the work issue")
+        applied_through_id = int(comment_value)
+        if repository_url is not None:
+            expected_url = (
+                f"{repository_url.rstrip('/')}/issues/{expected_issue}"
+                f"#issuecomment-{applied_through_id}"
+            )
+            if applied_through_url.casefold() != expected_url.casefold():
+                return _invalid_update("Applied Through does not match the repository")
+
+    prefix_match = _COMMENT_PREFIX_SHA256_LINE_RE.fullmatch(lines[3])
+    if prefix_match is None:
+        return _invalid_update("Comment Prefix SHA-256 metadata is malformed")
+    body_match = _BODY_SHA256_LINE_RE.fullmatch(lines[4])
+    if body_match is None:
+        return _invalid_update("Body SHA-256 metadata is malformed")
+    return UpdateResult(
+        "valid",
+        artifact=UpdateArtifact(
+            applied_through_id=applied_through_id,
+            applied_through_url=applied_through_url,
+            comment_prefix_sha256=prefix_match.group(1),
+            body_sha256=body_match.group(1),
         ),
     )

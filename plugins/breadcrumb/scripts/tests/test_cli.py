@@ -58,7 +58,26 @@ class CliTests(unittest.TestCase):
             exit_code, payload, _ = invoke(["inspect", "18"])
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["issue"]["number"], 18)
-        inspected.assert_called_once_with(mock.ANY, 18)
+        inspected.assert_called_once_with(mock.ANY, 18, comment_mode=None)
+
+    def test_inspect_accepts_explicit_comment_modes(self) -> None:
+        for mode in ("incremental", "all"):
+            with self.subTest(mode=mode), mock.patch.object(
+                breadcrumb, "resolve_repository", return_value=(None, object())
+            ), mock.patch.object(
+                breadcrumb,
+                "inspect_issue",
+                return_value={"projection_version": 1, "issue": {"number": 18}},
+            ) as inspected:
+                exit_code, payload, _ = invoke(["inspect", "18", "--comments", mode])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["issue"]["number"], 18)
+            inspected.assert_called_once_with(mock.ANY, 18, comment_mode=mode)
+
+    def test_inspect_rejects_unknown_comment_mode(self) -> None:
+        exit_code, payload, _ = invoke(["inspect", "18", "--comments", "recent"])
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(payload["error"]["code"], "invalid_arguments")
 
     def test_python_guard_runs_before_normal_work(self) -> None:
         with mock.patch.object(sys, "version_info", (3, 10, 0)):

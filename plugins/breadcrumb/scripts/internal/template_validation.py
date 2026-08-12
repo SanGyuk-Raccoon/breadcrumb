@@ -1,4 +1,4 @@
-"""Validate the four fixed templates bundled with the plugin."""
+"""Validate the fixed templates bundled with the plugin."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ TEMPLATE_FILES = {
     "work": "work.md",
     "comment-implementation": "comment-implementation.md",
     "comment-implementation-stale": "comment-implementation-stale.md",
+    "comment-update": "comment-update.md",
     "pull-request": "pull-request.md",
 }
 
@@ -97,6 +98,19 @@ def validate_template(template_type: str, value: str) -> list[TemplateProblem]:
                 "- Branch: [`<branch>`](<branch-url>)",
                 "- Verified Commit: [`<commit>`](<commit-url>)",
                 "- Reason: <reason>",
+            ],
+        )
+    if template_type == "comment-update":
+        return _require_exact_lines(
+            lines,
+            [
+                "## Breadcrumb Update",
+                "- Schema Version: 1",
+                "- Applied Through: [comment](<comment-url>)|none",
+                "- Comment Prefix SHA-256: `<comment-prefix-sha256>`",
+                "- Body SHA-256: `<body-sha256>`",
+                "## Summary",
+                "<summary>",
             ],
         )
     return _require_exact_lines(

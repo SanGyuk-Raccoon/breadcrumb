@@ -56,6 +56,20 @@ class WorkDocumentTests(unittest.TestCase):
         self.assertTrue(result.valid, result.errors)
         self.assertEqual(result.unresolved, 0)
 
+    def test_decision_brief_and_stable_todo_id_fit_schema_one(self) -> None:
+        body = work_body("in-progress", ["- [ ] T1 — Choose the retry policy."])
+        body = body.replace(
+            "Use the existing component.",
+            "### Decision Briefs\n\n#### T1 — Retry policy\n\n"
+            "- Why: callers need one policy.\n"
+            "- Options: bounded or unbounded.\n"
+            "- Recommendation: bounded.\n"
+            "- Reply: `T1: bounded`.",
+        )
+        result = parse_work_body(body)
+        self.assertTrue(result.valid, result.errors)
+        self.assertEqual(result.unresolved, 1)
+
     def test_todo_accepts_uppercase_checked_but_rejects_prose(self) -> None:
         checked = parse_work_body(work_body("complete", ["- [X] Done."]))
         prose = parse_work_body(work_body("in-progress", ["Decide this."]))
