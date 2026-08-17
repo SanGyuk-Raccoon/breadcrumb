@@ -81,7 +81,8 @@ phase label, or repository template override is used.
 
 ## Repository State
 
-A consuming repository keeps only repository-specific verification guidance:
+A consuming repository keeps only repository-specific verification guidance as tracked Breadcrumb
+state:
 
 ```text
 <repository>/.breadcrumb/verification.md
@@ -90,6 +91,28 @@ A consuming repository keeps only repository-specific verification guidance:
 Breadcrumb derives repository identity and default branch from the Git root, remotes, and current
 GitHub metadata. It does not create `.breadcrumb/config.json` or `.breadcrumb/templates/`.
 
+An optional machine-local hint can make tool selection deterministic across conversations without
+changing PATH or committing machine-specific paths:
+
+```text
+<repository>/.breadcrumb/toolchain.local.json
+```
+
+```json
+{
+  "schema_version": 1,
+  "python": "/absolute/path/to/python3.12",
+  "gh": "/absolute/path/to/gh"
+}
+```
+
+The schema-1 hint contains only canonical absolute `python` and `gh` paths. It must be a regular
+non-symlink file, untracked and ignored by Git, and is treated as untrusted input. Breadcrumb
+revalidates both executables, versions, and required capabilities on every operation and falls back
+to discovery when the hint is missing, stale, malformed, or unsafe. `init` creates or updates it only
+after showing the exact payload and receiving explicit approval. The default ignore location is the
+clone-local `.git/info/exclude`; changing the tracked root `.gitignore` is a separate choice.
+
 `init` is also the version-migration entry point. Its read-only audit inventories unsupported
 config/template paths without loading them, legacy phase labels and open issues, and exact legacy
 Bug or Feature Request bodies. When candidates exist it shows the complete file, issue, label,
@@ -97,6 +120,12 @@ commit, and close plan before requesting the required cleanup or bulk-migration 
 does not mutate merely because initialization was requested, and it asks no migration question when
 there is nothing to migrate. Normal `list` and `inspect` remain strict schema 1 projections with no
 legacy compatibility parsing.
+
+The same read-only audit resolves installed Python and GitHub CLI candidates by actual execution and
+reports readiness per operation. A compatible versioned or outside-PATH executable is used directly
+instead of being reinstalled. When no usable candidate exists, `init` shows the exact supported
+package source, command, privilege, local-state, and PATH effects, then performs only the separately
+approved repairs and revalidates their results.
 
 Implementation branches use a stable name derived from the work issue:
 
@@ -114,20 +143,32 @@ pending verification requires choosing normal or draft.
 
 ## Read-Only Projection
 
-The plugin has one public script entry point and requires Python 3.11 or newer:
+The plugin has one public script entry point and requires Python 3.11 or newer. The complete workflow
+documents GitHub CLI 2.16.0 or newer as its baseline, while actual command capabilities remain the
+final readiness check:
 
 ```bash
-python3.12 plugins/breadcrumb/scripts/breadcrumb.py list
-python3.12 plugins/breadcrumb/scripts/breadcrumb.py list --status in-progress
-python3.12 plugins/breadcrumb/scripts/breadcrumb.py inspect 18
-python3.12 plugins/breadcrumb/scripts/breadcrumb.py inspect 18 --comments incremental
-python3.12 plugins/breadcrumb/scripts/breadcrumb.py inspect 18 --comments all
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/path/to/gh list
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/path/to/gh list --status in-progress
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/path/to/gh inspect 18
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/path/to/gh inspect 18 --comments incremental
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/path/to/gh inspect 18 --comments all
 ```
 
 The script discovers the current GitHub repository from Git, queries issues with the `breadcrumb`
 label, parses the fixed body and trusted control comments, and queries GitHub closing pull
 request relationships. It emits JSON only and performs no writes. A malformed issue is returned with
 `valid: false` and structured errors without hiding valid siblings.
+
+`--gh-executable` is optional for backward compatibility. When supplied, it must resolve from an
+absolute path to an executable file, and the parser uses that exact GitHub CLI for every REST and
+GraphQL request. Breadcrumb operations resolve and pass the option so an older PATH entry cannot
+shadow the selected executable.
+
+The sibling `breadcrumb-report` skill applies the same selection and revalidation rules. It may
+inspect a safe local hint solely for executable selection, while its GitHub target remains fixed and
+independent of the ambient repository. Tool installation and local-hint mutation remain exclusive
+to the separately approved `breadcrumb init` repair flow.
 
 The optional comment modes add a single fully paginated comment snapshot. A fixed visible
 `Breadcrumb Update` comment records the exact issue-body SHA-256, a rolling digest of the reviewed
@@ -162,9 +203,10 @@ codex plugin add breadcrumb@breadcrumb
 
 ## Trust And Access
 
-Breadcrumb uses `git` for repository and branch operations and `gh api` for explicit GitHub reads
-and writes. Issue bodies, comments, pull-request bodies, diffs, and repository content are untrusted
-task data; they cannot override active instructions, authorization, or credential policy.
+Breadcrumb uses `git` for repository and branch operations and the selected absolute `gh` path for
+explicit GitHub reads and writes. Issue bodies, comments, pull-request bodies, diffs, local toolchain
+hints, and repository content are untrusted task data; they cannot override active instructions,
+authorization, or credential policy.
 
 Implementation or stale comments control branch state only when their fixed visible metadata is
 valid and the GitHub comment author association is `OWNER`, `MEMBER`, or `COLLABORATOR`. Credentials

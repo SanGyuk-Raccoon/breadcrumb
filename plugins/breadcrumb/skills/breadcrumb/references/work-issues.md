@@ -16,12 +16,28 @@ Apply the shared rules in `SKILL.md` and the exact contracts in `artifacts.md`.
 Treat repository setup, re-audit, and version migration as one `init` operation. Discovery is always
 read-only; an explicit init request does not approve migration side effects.
 
+### Resolve Toolchain Readiness
+
+1. Apply the shared toolchain resolver before GitHub access. Inspect the exact
+   `.breadcrumb/toolchain.local.json` path, file type, symlink state, containment, tracking, and
+   ignore status before reading it. Read and parse it only when every shared safety condition holds;
+   otherwise report the reason and continue safe discovery without executing a configured path.
+2. Resolve and validate absolute Python and `gh` candidates. Classify each as usable, outside PATH
+   or shadowed by another version, missing, version or capability deficient, or unsafe. Distinguish
+   authentication and authorization failures from installation failures.
+3. Use a compatible candidate without installing anything or changing the system default
+   `python3`. Use an outside-PATH candidate by absolute path. Report issue operations separately
+   from stale-PR conversion when an older `gh` supports `api --hostname` but not `pr ready --undo`.
+4. When discovery finds no usable candidate or the selected paths cannot be recovered reliably in a
+   future operation, prepare an exact repair plan. Do not install, upgrade, write local state, change
+   an ignore rule, or edit PATH during discovery.
+
 ### Resolve Readiness
 
-1. Resolve the Git root, selected remote, GitHub repository, and current default branch without a
-   Breadcrumb config file. Check Git, GitHub CLI, Python 3.11+, authentication, Issues availability,
-   issue/comment/PR write capability needed by the requested workflow, fetch access, and push access
-   separately.
+1. With the selected absolute tools, resolve the Git root, selected remote, GitHub repository, and
+   current default branch without a Breadcrumb config file. Check authentication, Issues
+   availability, issue/comment/PR write capability needed by the requested workflow, fetch access,
+   and push access separately.
 2. Require one exact `breadcrumb` label. Create it during an explicitly requested initialization
    when missing. Do not create phase or type labels.
 3. Require `.breadcrumb/verification.md` to be a regular in-repository file. If absent, inspect the
@@ -31,12 +47,55 @@ read-only; an explicit init request does not approve migration side effects.
    before implementation. Permit issue-only operations while it is missing, but report that
    implementation is not ready.
 
+### Plan And Confirm Toolchain Repair
+
+1. Show the selected repository and, for every deficient tool, its discovered paths and versions,
+   missing capabilities, exact install or upgrade command, package source, target condition,
+   privilege requirement, and whether the action changes a package repository, shell profile, PATH,
+   local hint, or Git exclude file.
+2. Ask separately before installing or upgrading Python, installing or upgrading `gh`, adding an
+   external package source, changing a shell profile or persistent PATH, or creating or updating
+   `.breadcrumb/toolchain.local.json` and `.git/info/exclude`. An explicit `init` request alone
+   approves none of these system or machine-local mutations.
+3. Use only a supported package manager and an official or already trusted package source. Never
+   improvise a `curl | sh` installer, replace the system Python command, or guess a command for an
+   unsupported platform. When no safe automatic route is known, show exact manual follow-up and the
+   affected readiness instead.
+4. For a local hint, show the complete schema-1 JSON payload, exact path, current file metadata, and
+   exact ignore destination and pattern. Default to the local Git metadata file
+   `.git/info/exclude` with `/.breadcrumb/toolchain.local.json`. Offer a tracked root `.gitignore`
+   change only when the user explicitly wants a repository-wide convention, and confirm it as a
+   separate repository mutation.
+5. When no repair is needed, ask no toolchain question and continue the ordinary initialization.
+
+### Apply Approved Toolchain Repair
+
+1. Immediately revalidate the repository, candidate paths and capabilities, package manager and
+   source, local hint metadata, ignore state, and every approved command or payload. Stop before the
+   first write when any material basis changed.
+2. Apply each approved system action once and preserve successful earlier actions if a later action
+   fails. Capture the installed executable's canonical absolute path without assuming a new shell or
+   refreshed PATH, then re-run the version, capability, authentication, and requested-operation
+   checks through that exact path.
+3. Create or update the local hint only after both executable paths pass validation. Require the
+   parent directory and target to remain safe, refuse a tracked file or symlink, write only the exact
+   schema and path keys atomically, and verify the final bytes and file identity. Store no observed
+   version, readiness, command, permission, environment, issue, or credential data.
+4. Add the exact local exclude pattern without deleting, reordering, or duplicating unrelated
+   entries, then require `git check-ignore` to identify the local hint and require `git ls-files` not
+   to identify it. Do not edit root `.gitignore` unless that exact mutation was separately approved.
+5. Re-run shared toolchain resolution from the final state. Report completed, failed or uncertain,
+   and unattempted repairs separately; never claim the requested operation is ready merely because a
+   package command succeeded.
+
 ### Discover Version Migration
 
-1. Inventory `.breadcrumb/config.json`, `.breadcrumb/templates`, and every path contained by that
-   directory without reading file bytes, loading template overrides, or following a symlink. Record
-   the exact path, kind, containment, tracking, staged/unstaged state, and whether the fetched default
-   branch contains each artifact.
+1. Inventory `.breadcrumb/config.json`, `.breadcrumb/templates`, and every unsupported path contained
+   by that directory without reading file bytes, loading template overrides, or following a symlink.
+   Exclude only `verification.md` and a local hint already recognized as safe and ignored by the
+   toolchain audit. Record the exact path, kind, containment, tracking, staged/unstaged state, and
+   whether the fetched default branch contains each artifact. Treat a tracked or published
+   `toolchain.local.json` as unsupported repository state and never load it as a tool hint.
 2. Fully paginate repository labels and GitHub-open issues. Find issues carrying
    `breadcrumb:backlog`, `breadcrumb:requirement`, or `breadcrumb:design`, and independently find
    issue bodies matching a complete legacy Bug or Feature Request contract from `artifacts.md`.
@@ -94,9 +153,11 @@ read-only; an explicit init request does not approve migration side effects.
 
 ### Report Readiness
 
-Report readiness by operation rather than one global boolean: issue reads, issue writes,
-implementation fetch/push, verification, and PR writes. Include preserved or unpublished legacy
-state only where it affects that operation.
+Report the selected canonical tool paths, actual versions, checked capabilities, repair outcomes,
+and readiness by operation rather than one global boolean: issue reads, issue writes, implementation
+fetch/push, stale-PR conversion, verification, and PR writes. Include preserved or unpublished
+legacy state only where it affects that operation. The report is ephemeral and is never copied into
+the local hint or durable issue state.
 
 ## Open
 

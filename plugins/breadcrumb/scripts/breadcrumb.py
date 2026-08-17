@@ -26,6 +26,8 @@ if sys.version_info < (3, 11) and __name__ == "__main__":
     sys.exit(_unsupported_runtime())
 
 import argparse
+import os
+from pathlib import Path
 
 from internal import WORK_STATUSES
 from internal.cli import JsonArgumentParser, operational_error, write_diagnostic, write_json
@@ -48,8 +50,27 @@ def _positive_issue_number(value: str) -> int:
     return number
 
 
+def _absolute_executable(value: str) -> str:
+    path = Path(value)
+    message = "GitHub CLI executable must be an absolute path to an executable file"
+    if not path.is_absolute():
+        raise argparse.ArgumentTypeError(message)
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise argparse.ArgumentTypeError(message) from exc
+    if not resolved.is_file() or not os.access(resolved, os.X_OK):
+        raise argparse.ArgumentTypeError(message)
+    return str(resolved)
+
+
 def _parser() -> JsonArgumentParser:
     parser = JsonArgumentParser(description="Inspect Breadcrumb work issues.")
+    parser.add_argument(
+        "--gh-executable",
+        type=_absolute_executable,
+        help="Absolute path to the GitHub CLI executable.",
+    )
     commands = parser.add_subparsers(dest="command", required=True)
 
     list_parser = commands.add_parser("list", help="List Breadcrumb work issues.")
@@ -67,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         return _unsupported_runtime()
     try:
         arguments = _parser().parse_args(argv)
-        _, client = resolve_repository()
+        _, client = resolve_repository(gh_executable=arguments.gh_executable)
         if arguments.command == "list":
             payload = list_issues(
                 client,

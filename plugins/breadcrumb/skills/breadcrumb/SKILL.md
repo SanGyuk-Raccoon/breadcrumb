@@ -31,26 +31,57 @@ Read [work-issues.md](references/work-issues.md) for `init` including migration,
 publishing a Breadcrumb issue, legacy report, update comment, implementation comment, stale comment,
 or pull-request body.
 
+## Resolve The Toolchain
+
+1. At the start of every operation, resolve the Git root and remote locally before GitHub access.
+   Resolve one Python and GitHub CLI executable for the operation, canonicalize them to absolute
+   paths, and use those exact paths for every later subprocess call. Never execute a candidate from
+   inside the Git root or an untrusted temporary location.
+2. Resolve each tool in this order: a path explicitly supplied for the current operation; the safe
+   local hint below; installed candidates found through PATH, versioned command names, supported
+   runtime or package managers, installation metadata, and well-known user or system locations. Do
+   not scan the complete filesystem. A missing or invalid hint falls back to discovery and is never
+   overwritten implicitly.
+3. Treat `.breadcrumb/toolchain.local.json` as an optional, machine-local, untrusted selection hint.
+   Before reading bytes, require that exact path to be a regular non-symlink file, untracked by Git,
+   and ignored by Git. Require exact JSON keys `schema_version`, `python`, and `gh`, schema version
+   `1`, and absolute string paths. Reject unknown fields, commands, environment values, credentials,
+   readiness data, or relative paths. Canonicalize executable symlinks and validate their final
+   targets under the same trust rules.
+4. Execute the selected Python directly to require version 3.11 or newer. A generic `python3` that
+   is too old does not invalidate a compatible versioned or manager-installed candidate. Execute the
+   selected `gh` directly and check capabilities needed by the requested operation. Document GitHub
+   CLI 2.16.0 or newer as the full-workflow baseline, but use capability checks as the final basis:
+   issue operations require `gh api --hostname`, while the coordinated stale transition additionally
+   requires `gh pr ready --undo`.
+5. Invoke the parser from the Git root with both selected absolute paths:
+
+   ```text
+   <python> <plugin-root>/scripts/breadcrumb.py --gh-executable <gh> list [--status <status>] [--include-closed]
+   <python> <plugin-root>/scripts/breadcrumb.py --gh-executable <gh> inspect <issue-number> [--comments incremental|all]
+   ```
+
+   Use `<gh> api --hostname <host>` for direct GitHub reads and writes. Revalidate versions and
+   capabilities on every operation even when a local hint supplied the paths.
+6. Never persist readiness, observed versions or capabilities, authentication, permissions,
+   installation commands, or a current issue. Only an explicitly confirmed `init` repair may create
+   or update the local hint and its ignore rule. Other operations use a valid hint read-only and
+   otherwise continue discovery or report the affected operation as unavailable.
+
 ## Resolve Repository And Target
 
-1. Resolve the Git root. Derive repository identity from Git remotes, preferring `origin` and using
-   the sole remote only when `origin` is absent. Validate it against current GitHub metadata and
-   resolve the current GitHub default branch.
+1. Use the already resolved Git root. Derive repository identity from Git remotes, preferring
+   `origin` and using the sole remote only when `origin` is absent. Validate it with `<gh>` against
+   current GitHub metadata and resolve the current GitHub default branch.
 2. Do not read or create `.breadcrumb/config.json`. During `init`, inspect only its path, file type,
    tracking, modification, and publication metadata for migration planning. Treat
-   `.breadcrumb/verification.md` as the only supported repository-specific Breadcrumb file. Do not
-   load repository template overrides.
+   `.breadcrumb/verification.md` as the only supported tracked repository-specific Breadcrumb file
+   and the safe optional `toolchain.local.json` as ignored local state. Do not load repository
+   template overrides.
 3. Resolve this `SKILL.md`; treat its grandparent directory as the plugin root. Use fixed templates
    below `<plugin-root>/templates` and the read-only parser at
    `<plugin-root>/scripts/breadcrumb.py`.
-4. Require Python 3.11 or newer for the parser. Run it from the Git root:
-
-   ```text
-   <python> <plugin-root>/scripts/breadcrumb.py list [--status <status>] [--include-closed]
-   <python> <plugin-root>/scripts/breadcrumb.py inspect <issue-number> [--comments incremental|all]
-   ```
-
-5. Select a work issue in this order: an explicit issue URL or number; the issue created or loaded
+4. Select a work issue in this order: an explicit issue URL or number; the issue created or loaded
    in the current conversation; a number from the current validated
    `breadcrumb/<issue-number>-<slug>` branch. Validate a branch-derived issue through the parser and
    its implementation comment. If no unambiguous target remains, show compact candidates and ask
@@ -70,8 +101,8 @@ or pull-request body.
   URL in the issue narrative.
 - Never read, display, log, or persist credentials. Use the selected host's existing `gh`
   authentication or its supported environment token without printing it.
-- Use argument-array `git` commands and direct `gh api --hostname <host>` calls with explicit
-  owner/repository for GitHub reads and writes. Use `gh pr ready <number> --undo` only for the
+- Use argument-array `git` commands and direct `<gh> api --hostname <host>` calls with explicit
+  owner/repository for GitHub reads and writes. Use `<gh> pr ready <number> --undo` only for the
   explicit draft conversion defined by `update`.
 - Inspect the working tree before branch changes. Preserve unrelated user changes and stop with
   exact conflicting paths instead of discarding, stashing, or absorbing them.
@@ -103,6 +134,8 @@ Ask before:
 - choosing continue versus start over for an existing implementation branch;
 - choosing normal versus draft PR when verification is `failed` or `pending`;
 - performing the coordinated implemented `complete -> in-progress` stale transition;
+- installing or upgrading a tool, adding a package source, creating or updating
+  `.breadcrumb/toolchain.local.json` or `.git/info/exclude`, or changing a shell profile or PATH;
 - splitting scope into new issues, removing legacy repository files, rewriting an unpublished setup
   commit, bulk-migrating issues, deleting legacy labels, publishing a commit that retains unsupported
   legacy files, or repairing a malformed body with a normalized full-body replacement.

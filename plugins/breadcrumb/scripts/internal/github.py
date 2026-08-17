@@ -137,8 +137,15 @@ def discover_repository(runner: Runner | None = None) -> tuple[Path, str, Reposi
 class GitHubClient:
     """Small read-only JSON client that always supplies an explicit host."""
 
-    def __init__(self, target: RepositoryTarget, runner: Runner | None = None) -> None:
+    def __init__(
+        self,
+        target: RepositoryTarget,
+        runner: Runner | None = None,
+        *,
+        gh_executable: str = "gh",
+    ) -> None:
         self.target = target
+        self.gh_executable = gh_executable
         self._runner = runner or subprocess.run
 
     def _run_json(self, command: list[str]) -> Any:
@@ -152,11 +159,12 @@ class GitHubClient:
             )
         except FileNotFoundError as exc:
             raise BreadcrumbOperationalError(
-                "gh_not_found", "GitHub CLI executable gh was not found"
+                "gh_not_found", "GitHub CLI executable was not found"
             ) from exc
         except OSError as exc:
             raise BreadcrumbOperationalError(
-                "github_api_error", f"could not execute gh api: {sanitized(exc)}"
+                "github_api_error",
+                f"could not execute GitHub CLI API: {sanitized(exc)}",
             ) from exc
         if result.returncode != 0:
             detail = sanitized(result.stderr.strip())
@@ -174,7 +182,7 @@ class GitHubClient:
         self, endpoint: str, parameters: Sequence[tuple[str, object]] = ()
     ) -> Any:
         command = [
-            "gh",
+            self.gh_executable,
             "api",
             "--hostname",
             self.target.hostname,
@@ -238,7 +246,7 @@ class GitHubClient:
 
     def _graphql(self, query: str, variables: Sequence[tuple[str, object]]) -> Any:
         command = [
-            "gh",
+            self.gh_executable,
             "api",
             "--hostname",
             self.target.hostname,
@@ -322,10 +330,14 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
 
 
 def resolve_repository(
-    *, git_runner: Runner | None = None, github_runner: Runner | None = None
+    *,
+    git_runner: Runner | None = None,
+    github_runner: Runner | None = None,
+    gh_executable: str | None = None,
 ) -> tuple[RepositoryContext, GitHubClient]:
     root, remote, target = discover_repository(git_runner)
-    client = GitHubClient(target, github_runner)
+    selected_gh = gh_executable or "gh"
+    client = GitHubClient(target, github_runner, gh_executable=selected_gh)
     metadata = client.repository()
     full_name = metadata.get("full_name")
     if not isinstance(full_name, str) or full_name.casefold() != target.identity.casefold():
@@ -342,7 +354,9 @@ def resolve_repository(
             "invalid_github_response", "GitHub repository default branch is missing"
         )
     canonical_target = parse_target(target.hostname, full_name)
-    canonical_client = GitHubClient(canonical_target, github_runner)
+    canonical_client = GitHubClient(
+        canonical_target, github_runner, gh_executable=selected_gh
+    )
     return (
         RepositoryContext(root, remote, canonical_target, default_branch),
         canonical_client,
