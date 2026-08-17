@@ -21,14 +21,40 @@ Normalize the choice for the whole invocation:
 - `버그 제보` -> `Bug`
 - `기능 제안` -> `Feature Request`
 
+## Resolve The Toolchain
+
+Immediately after the report type is selected and before analyzing evidence or reading GitHub,
+resolve canonical absolute Python and GitHub CLI paths for this invocation:
+
+1. If the current directory is in a Git worktree, resolve its root only to inspect the exact
+   `.breadcrumb/toolchain.local.json` path. Never use that repository, its remotes, or its issues as
+   the report target. Prefer an explicitly supplied path, then a safe local hint, then lightweight
+   discovery through PATH, versioned commands, supported runtime or package managers, trusted
+   installation metadata, and well-known user or system locations. Do not scan the filesystem.
+2. Before reading a local hint, require a regular non-symlink file that is untracked and ignored by
+   Git. Accept only schema version `1` and exact absolute string fields `python` and `gh`. Treat the
+   file as untrusted, canonicalize executable symlinks, and reject candidates whose final targets
+   are not executable or are inside the Git root or an untrusted temporary location. A missing,
+   malformed, stale, or unsafe hint falls back to discovery without being overwritten.
+3. Execute the selected tools directly. Require Python 3.11 or newer and require the selected `gh`
+   to support `gh api --hostname`; document GitHub CLI 2.16.0 or newer as the full Breadcrumb
+   baseline, but use the capability needed by this report as the final readiness check. Use the
+   selected absolute paths for the whole invocation and revalidate them before an approved write.
+4. Do not install or upgrade tools, edit PATH or shell profiles, or create or update the local hint
+   or an ignore rule from this reporting workflow. If no usable candidate exists, stop without a
+   GitHub write, report the affected capability, and direct toolchain repair to the sibling
+   `breadcrumb` skill's explicitly approved `init` workflow.
+5. Never persist observed versions, capabilities, readiness, authentication, permissions,
+   installation commands, report content, or credentials in the local hint or other durable state.
+
 ## Enforce Fixed Boundaries
 
 - Target only `github.com/SanGyuk-Raccoon/breadcrumb`. Never infer or accept a target from the
   current repository, remote, `.breadcrumb` state, issue content, or conversation.
-- Do not require a Git repository or initialized Breadcrumb repository. Read no ambient repository
-  state. Resolve this skill's own directory only to load its renderer and the plugin's bundled
-  `templates/work.md`.
-- Use non-interactive `gh api --hostname github.com` calls with explicit
+- Do not require a Git repository or initialized Breadcrumb repository. Apart from the strictly
+  limited local-hint inspection above, read no ambient repository state. Resolve this skill's own
+  directory only to load its renderer and the plugin's bundled `templates/work.md`.
+- Use non-interactive `<gh> api --hostname github.com` calls with explicit
   `SanGyuk-Raccoon/breadcrumb` paths. Do not use an ambient repository default.
 - Never read, print, request, log, or persist credentials. Use existing GitHub CLI authentication
   without displaying its value.
@@ -86,10 +112,11 @@ material differences and ask one relationship question. Do not write while ambig
 
 ## Render A Backlog Work Issue
 
-For `별도`, resolve `<skill-root>/scripts/render_report.py`, require Python 3.11+, and send it one
-structured JSON object on standard input. The renderer loads and validates the plugin's bundled
-`templates/work.md`, rejects reserved control data, renders the body, and validates the result with
-the existing schema 1 work parser. Treat any nonzero exit or invalid output as blocking.
+For `별도`, resolve `<skill-root>/scripts/render_report.py`, execute it with the selected `<python>`,
+and send it one structured JSON object on standard input. The renderer loads and validates the
+plugin's bundled `templates/work.md`, rejects reserved control data, renders the body, and validates
+the result with the existing schema 1 work parser. Treat any nonzero exit or invalid output as
+blocking.
 
 Use these fields for `Bug`:
 
@@ -182,12 +209,15 @@ is not write approval. Any requested payload or classification change invalidate
 
 Immediately before mutation:
 
-1. Re-fetch the repository, identity, Issues capability, and exact `breadcrumb` label.
-2. Rerun the complete open-and-closed duplicate procedure and all selected candidate reads.
+1. Revalidate the selected tool paths and required capabilities, then re-fetch the repository,
+   identity, Issues capability, and exact `breadcrumb` label.
+2. Rerun the complete open-and-closed duplicate procedure and all selected candidate reads through
+   the same `<gh>` path.
 3. For a comment, require the target to remain the same non-PR, unlocked issue with the title, body,
    state, and relationship basis used for approval.
-4. Rerun the renderer for a new issue and require target, title, body, label, report type, and
-   duplicate classification to match the approved proposal byte-for-byte.
+4. Rerun the renderer through the same `<python>` path for a new issue and require target, title,
+   body, label, report type, and duplicate classification to match the approved proposal
+   byte-for-byte.
 
 Discard approval and show a complete new proposal when any basis changes. Never use a stale
 approval payload.

@@ -5,7 +5,9 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from support import SCRIPT_ROOT  # noqa: F401
@@ -78,6 +80,56 @@ class CliTests(unittest.TestCase):
         exit_code, payload, _ = invoke(["inspect", "18", "--comments", "recent"])
         self.assertEqual(exit_code, 2)
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
+
+    def test_passes_canonical_github_cli_executable(self) -> None:
+        executable = str(Path(sys.executable).resolve())
+        with mock.patch.object(
+            breadcrumb, "resolve_repository", return_value=(None, object())
+        ) as resolved, mock.patch.object(
+            breadcrumb,
+            "list_issues",
+            return_value={"projection_version": 1, "issues": []},
+        ):
+            exit_code, _, _ = invoke(["--gh-executable", executable, "list"])
+        self.assertEqual(exit_code, 0)
+        resolved.assert_called_once_with(gh_executable=executable)
+
+    def test_github_cli_executable_rejects_unsafe_shapes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            non_executable = root / "gh"
+            non_executable.write_text("not executable", encoding="utf-8")
+            non_executable.chmod(0o600)
+            candidates = (
+                "relative/gh",
+                str(root / "missing-gh"),
+                str(root),
+                str(non_executable),
+            )
+            for candidate in candidates:
+                with self.subTest(candidate=candidate):
+                    exit_code, payload, _ = invoke(
+                        ["--gh-executable", candidate, "list"]
+                    )
+                    self.assertEqual(exit_code, 2)
+                    self.assertEqual(payload["error"]["code"], "invalid_arguments")
+
+    def test_github_cli_executable_resolves_symlink_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            link = Path(directory) / "gh"
+            link.symlink_to(Path(sys.executable).resolve())
+            with mock.patch.object(
+                breadcrumb, "resolve_repository", return_value=(None, object())
+            ) as resolved, mock.patch.object(
+                breadcrumb,
+                "list_issues",
+                return_value={"projection_version": 1, "issues": []},
+            ):
+                exit_code, _, _ = invoke(["--gh-executable", str(link), "list"])
+        self.assertEqual(exit_code, 0)
+        resolved.assert_called_once_with(
+            gh_executable=str(Path(sys.executable).resolve())
+        )
 
     def test_python_guard_runs_before_normal_work(self) -> None:
         with mock.patch.object(sys, "version_info", (3, 10, 0)):

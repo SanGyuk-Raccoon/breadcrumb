@@ -124,28 +124,51 @@ class RepositoryDiscoveryTests(unittest.TestCase):
         git_runner = GitRunner(url="git@GHE.EXAMPLE.TEST:ACME/Widgets.git")
         github_runner = RepositoryRunner(full_name="acme/widgets")
         context, client = resolve_repository(
-            git_runner=git_runner, github_runner=github_runner
+            git_runner=git_runner,
+            github_runner=github_runner,
+            gh_executable="/opt/github/bin/gh",
         )
         self.assertEqual(context.target.hostname, "ghe.example.test")
         self.assertEqual(context.target.identity, "acme/widgets")
         self.assertEqual(client.target, context.target)
+        self.assertEqual(client.gh_executable, "/opt/github/bin/gh")
+        self.assertTrue(
+            all(
+                command[0] == "/opt/github/bin/gh"
+                for command in github_runner.calls
+            )
+        )
 
 
 class GitHubTransportTests(unittest.TestCase):
     def test_rest_collection_is_fully_paginated(self) -> None:
         runner = PagingRunner()
-        client = GitHubClient(parse_target("ghe.example.test", "acme/widgets"), runner)
+        client = GitHubClient(
+            parse_target("ghe.example.test", "acme/widgets"),
+            runner,
+            gh_executable="/opt/github/bin/gh",
+        )
         issues = client.issues_with_label("breadcrumb", state="all")
         self.assertEqual(len(issues), 101)
         self.assertEqual(len(runner.calls), 2)
+        self.assertTrue(
+            all(command[0] == "/opt/github/bin/gh" for command in runner.calls)
+        )
         self.assertTrue(all("--hostname" in command for command in runner.calls))
 
     def test_closing_pull_relationship_is_fully_paginated(self) -> None:
         runner = GraphqlRunner()
-        client = GitHubClient(parse_target("ghe.example.test", "acme/widgets"), runner)
+        client = GitHubClient(
+            parse_target("ghe.example.test", "acme/widgets"),
+            runner,
+            gh_executable="/opt/github/bin/gh",
+        )
         pulls = client.closing_pull_requests(1)
         self.assertEqual([item["number"] for item in pulls], [1, 2])
         self.assertEqual(len(runner.calls), 2)
+        self.assertTrue(
+            all(command[0] == "/opt/github/bin/gh" for command in runner.calls)
+        )
         query_argument = next(
             item for item in runner.calls[0] if item.startswith("query=")
         )
