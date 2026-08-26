@@ -1,6 +1,6 @@
 ---
 name: breadcrumb
-description: "Manage the complete Breadcrumb GitHub work-issue workflow. Use when Codex needs to initialize, audit, or migrate a repository, capture a new work item, list or load durable context and issue-comment decisions, update requirements, design, Todo, or status, review an issue or implementation, implement a complete issue on its Breadcrumb branch, resume or restart implementation, or create the linked pull request."
+description: "Manage the complete Breadcrumb GitHub work-issue and repository-local ADR workflow. Use when Codex needs to initialize, audit, or migrate a repository, capture a new work item, list or load durable context and issue-comment decisions, plan or find ADRs, update requirements, design, Todo, or status, review an issue or implementation, implement a complete issue on its Breadcrumb branch, resume or restart implementation, or create the linked pull request."
 ---
 
 # Breadcrumb
@@ -29,7 +29,9 @@ Read [work-issues.md](references/work-issues.md) for `init` including migration,
 `list`, `load`, `update`, or `review`. Read [delivery.md](references/delivery.md) for `implement` or
 `pr`. Read [artifacts.md](references/artifacts.md) whenever parsing, rendering, repairing, or
 publishing a Breadcrumb issue, legacy report, update comment, implementation comment, stale comment,
-or pull-request body.
+pull-request body, or ADR. Read [adrs.md](references/adrs.md) for `init`, `update`, `implement`, or
+`pr`, `load`, or `review`; and for an `open` operation that may publish a complete plan. A
+backlog-only capture and an issue overview do not require ADR search.
 
 ## Resolve The Toolchain
 
@@ -54,11 +56,14 @@ or pull-request body.
    CLI 2.16.0 or newer as the full-workflow baseline, but use capability checks as the final basis:
    issue operations require `gh api --hostname`, while the coordinated stale transition additionally
    requires `gh pr ready --undo`.
-5. Invoke the parser from the Git root with both selected absolute paths:
+5. Invoke issue projections from the Git root with both selected absolute paths. Invoke the local
+   ADR projection with the selected Python; it derives repository identity from Git and performs no
+   GitHub call:
 
    ```text
    <python> <plugin-root>/scripts/breadcrumb.py --gh-executable <gh> list [--status <status>] [--include-closed]
    <python> <plugin-root>/scripts/breadcrumb.py --gh-executable <gh> inspect <issue-number> [--comments incremental|all]
+   <python> <plugin-root>/scripts/breadcrumb.py adr [--compact] [--base <git-ref>] [--finder-input-json <compact-json>]
    ```
 
    Use `<gh> api --hostname <host>` for direct GitHub reads and writes. Revalidate versions and
@@ -75,9 +80,10 @@ or pull-request body.
    current GitHub metadata and resolve the current GitHub default branch.
 2. Do not read or create `.breadcrumb/config.json`. During `init`, inspect only its path, file type,
    tracking, modification, and publication metadata for migration planning. Treat
-   `.breadcrumb/verification.md` as the only supported tracked repository-specific Breadcrumb file
-   and the safe optional `toolchain.local.json` as ignored local state. Do not load repository
-   template overrides.
+   `.breadcrumb/verification.md` and valid `.breadcrumb/adr/*.md` as supported tracked
+   repository-specific Breadcrumb files. A missing ADR directory is normal and must not be created
+   by discovery or `init`. Treat the safe optional `toolchain.local.json` as ignored local state. Do
+   not load repository template overrides.
 3. Resolve this `SKILL.md`; treat its grandparent directory as the plugin root. Use fixed templates
    below `<plugin-root>/templates` and the read-only parser at
    `<plugin-root>/scripts/breadcrumb.py`.
@@ -107,8 +113,9 @@ or pull-request body.
 - Inspect the working tree before branch changes. Preserve unrelated user changes and stop with
   exact conflicting paths instead of discarding, stashing, or absorbing them.
 - Treat parser operational failures as blocking because the projection is untrustworthy. Isolate
-  per-issue `valid: false` results for `list`, and permit only `load`, `review`, or a confirmed
-  repair `update` until repaired. Never overwrite an unsupported future schema.
+  per-issue `valid: false` results for `list`. Treat an invalid ADR corpus or base diff as blocking
+  for planning completion, implementation, and PR publication. Permit only read-only diagnosis or a
+  confirmed repair until the relevant state is valid. Never overwrite an unsupported future schema.
 
 ## Apply Status Gates
 
@@ -120,6 +127,10 @@ Do not derive Status from checkbox counts. When resolving the last Todo, reasses
 set `complete` only when implementation can proceed; otherwise append the next unresolved Todo and
 keep `in-progress`. Allow `backlog -> in-progress|complete`, `in-progress -> complete`, and
 `complete -> in-progress`. Never move started work back to `backlog`.
+
+Before setting `complete`, also require the ADR planning gate from `adrs.md`: Planned Change Scope,
+a digest-bound complete finder result, a final disposition, and complete drafts or lifecycle edits
+when the disposition changes the corpus. An empty corpus satisfies semantic coverage as `0/0`.
 
 Require an open, valid `complete` issue before implementation. Require a current implementation
 comment before creating a new PR. Implementation and PR publication do not change body Status.

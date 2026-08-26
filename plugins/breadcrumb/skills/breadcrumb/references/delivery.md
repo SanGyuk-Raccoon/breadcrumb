@@ -14,6 +14,9 @@ Apply the shared rules in `SKILL.md` and the exact contracts in `artifacts.md`.
 3. Fully load comments and select the latest trusted valid implementation or stale comment. Use its
    branch when present. Otherwise derive a lowercase ASCII slug from the current issue title and
    use `breadcrumb/<issue-number>-<slug>`. Keep that branch name stable after creation.
+4. Apply `adrs.md`. Load the issue's Planned Change Scope, ADR search digest, disposition, proposed
+   files, and lifecycle edits. Before touching planned ADR paths, compactly project the corpus against
+   the recorded Planning Base and require the pre-existing corpus to match the planning snapshot.
 
 ## Resolve The Branch
 
@@ -36,20 +39,28 @@ Apply the shared rules in `SKILL.md` and the exact contracts in `artifacts.md`.
 1. Map every durable requirement, design decision, implementation step, and Verification item to
    concrete code or tests. Inspect surrounding conventions before editing. Stop and recommend an
    `update` when durable meaning must change.
-2. Modify only scoped files. Review the diff for unrelated, generated, secret-bearing, or accidental
+2. Implement code and tests before materializing planned ADR files. Reconcile actual components,
+   paths, resources, behaviors, and decisions with the issue's ADR plan. Permit only non-material
+   wording or affected-path corrections. Stop for a planning `update` when a new decision, material
+   drift, or pre-existing corpus change appears; do not rerun a partial finder or invent a new ADR
+   disposition during implementation.
+3. Render and apply exactly the planned ADR create, supersede, or deprecate changes. Run the local
+   projection against Planning Base, require a valid graph and diff, and distinguish the expected
+   new digest from pre-existing baseline drift.
+4. Modify only scoped files. Review the diff for unrelated, generated, secret-bearing, or accidental
    changes. Stage explicit paths only and inspect the staged diff.
-3. Commit intentionally. Require a clean working tree after the commit and record the full HEAD.
+5. Commit intentionally. Require a clean working tree after the commit and record the full HEAD.
    Verify only committed content attributable to that HEAD.
-4. Reload `.breadcrumb/verification.md`. Combine its applicable repository checks with the issue
+6. Reload `.breadcrumb/verification.md`. Combine its applicable repository checks with the issue
    Verification section. Inspect each command before execution; require a finite non-interactive
    bound and explicit working directory. Reject elevation, credential access, external deployment,
    watch/server mode, or destructive data operations.
-5. Run safe independent checks even after another fails. Record command, working directory, exit
+7. Run safe independent checks even after another fails. Record command, working directory, exit
    code, concise redacted evidence, and pending reason as applicable. Classify Overall:
    - `failed` when any applicable check fails or verification guidance is invalid or unsafe;
    - `pending` when an applicable external/manual check or safe command remains unrun;
    - `passed` only when every applicable non-manual check passes and none remains pending.
-6. After every command, require HEAD unchanged and inspect worktree changes. Commit legitimate fixes
+8. After every command, require HEAD unchanged and inspect worktree changes. Commit legitimate fixes
    and rerun all checks needed for one attributable report. Never hide unexpected generated files.
 
 ## Push And Record
@@ -70,7 +81,8 @@ Apply the shared rules in `SKILL.md` and the exact contracts in `artifacts.md`.
 1. Require a valid open issue and current implementation comment. Stop when implementation is
    absent or stale. Check that the comment branch exists remotely at its verified commit.
 2. Resolve the current GitHub default branch as base and the implementation branch as head. Load
-   the committed merge-base diff and ensure GitHub can form a PR.
+   the committed merge-base diff and ensure GitHub can form a PR. Run the ADR base projection and
+   require that every ADR addition or lifecycle edit matches the issue plan and shares the code PR.
 3. Query the issue's fully paginated closing PR relationship and exact head/base open PRs:
    - return the existing matching open PR instead of duplicating it;
    - stop on multiple open closing PRs or conflicting head/base matches;
@@ -81,7 +93,9 @@ Apply the shared rules in `SKILL.md` and the exact contracts in `artifacts.md`.
    not alter verification evidence.
 5. Render the fixed pull-request template using the issue title by default, concise Summary and
    Changes from the durable issue, commits, and diff, and the exact final `Closes #<issue-number>`.
-   Target the default branch so GitHub creates the closing relationship.
+   In Changes include `ADR: not required`, one `ADR: <path>` line per created or updated ADR, and
+   `ADR supersedes: <old> -> <new>` for each replacement as applicable. Target the default branch so
+   GitHub creates the closing relationship.
 6. Revalidate repository, issue, implementation comment, remote ref, head/base tuple, linked PRs,
    and PR-write capability immediately before POST. Send title, body, head, base, and draft as
    structured JSON exactly once.

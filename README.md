@@ -2,7 +2,8 @@
 
 Breadcrumb is a GitHub issue based workflow for durable AI-assisted development. One cohesive pull
 request is planned, implemented, verified, and delivered through one work issue, while chat remains
-temporary working context.
+temporary working context. Optional repository-local ADRs keep long-lived decisions beside the code
+that implements them.
 
 ## Workflow
 
@@ -25,6 +26,10 @@ Decision Brief in the human-readable issue narrative with its reason, real optio
 recommendation, uncertainty, and a reply example. A user can answer several IDs in issue comments;
 `load` retrieves unprocessed comments by default and an explicit full-history mode remains available
 for audit or recovery.
+
+Before planning becomes `complete`, Breadcrumb records a Planned Change Scope, validates and
+searches the complete ADR corpus, and records an ADR disposition plus any required drafts. An empty
+corpus is valid coverage `0/0`.
 
 ## Skills
 
@@ -81,15 +86,17 @@ phase label, or repository template override is used.
 
 ## Repository State
 
-A consuming repository keeps only repository-specific verification guidance as tracked Breadcrumb
-state:
+A consuming repository keeps repository-specific verification guidance and, when adopted,
+repository-local ADRs as tracked Breadcrumb state:
 
 ```text
 <repository>/.breadcrumb/verification.md
+<repository>/.breadcrumb/adr/<work-issue-number>-<decision-slug>.md  # optional
 ```
 
 Breadcrumb derives repository identity and default branch from the Git root, remotes, and current
 GitHub metadata. It does not create `.breadcrumb/config.json` or `.breadcrumb/templates/`.
+The ADR directory is not created by `init`; its absence is the normal opt-in state.
 
 An optional machine-local hint can make tool selection deterministic across conversations without
 changing PATH or committing machine-specific paths:
@@ -141,6 +148,27 @@ Pull requests target the current GitHub default branch and end with `Closes #<is
 closing relationship is the durable PR link. Passed verification defaults to a normal PR; failed or
 pending verification requires choosing normal or draft.
 
+## Architecture Decision Records
+
+ADR files use a fixed schema-1 Markdown template with `accepted`, `superseded`, and `deprecated`
+states. Each file records its source Work Issue, Summary, Context, Affected Areas, Decision,
+Consequences, Review Triggers, and repository-local lifecycle relationships. Material decision
+changes create a new ADR; old records are superseded or deprecated and retained rather than deleted.
+
+Planning runs a local deterministic projection first. It validates safe regular UTF-8 Markdown,
+strict filenames and fields, Work Issue identity, bidirectional acyclic supersession, corpus digest,
+and optional base diff. The main context receives only a narrative-free document index. An isolated
+read-only subagent runs the compact finder, which orders every ADR by explicit Work Issue, path,
+component, resource, behavior, and lifecycle signals without filtering non-matches. It verifies
+content hashes before selectively reading related full ADRs and returns only related evidence,
+coverage, constraints, uncertainty, and a recommended disposition to the main planning context.
+
+Breadcrumb searches the complete corpus only when planning is finalized or materially reopened.
+Implementation does not repeat that search: after code and tests are implemented, it reconciles the
+actual diff with the issue's planned ADRs, adds or updates those files in the same commit and PR, and
+validates the result against Planning Base. The merge itself activates the ADR; there is no
+post-merge AI, runner, or synchronization job.
+
 ## Read-Only Projection
 
 The plugin has one public script entry point and requires Python 3.11 or newer. The complete workflow
@@ -153,12 +181,19 @@ python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/pa
 python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/path/to/gh inspect 18
 python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/path/to/gh inspect 18 --comments incremental
 python3.12 plugins/breadcrumb/scripts/breadcrumb.py --gh-executable /absolute/path/to/gh inspect 18 --comments all
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py adr
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py adr --base origin/main
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py adr --compact --base origin/main
+python3.12 plugins/breadcrumb/scripts/breadcrumb.py adr --base <commit> --finder-input-json '<compact-json>'
 ```
 
-The script discovers the current GitHub repository from Git, queries issues with the `breadcrumb`
-label, parses the fixed body and trusted control comments, and queries GitHub closing pull
-request relationships. It emits JSON only and performs no writes. A malformed issue is returned with
-`valid: false` and structured errors without hiding valid siblings.
+Issue commands discover the current GitHub repository from Git, query issues with the `breadcrumb`
+label, parse the fixed body and trusted control comments, and query GitHub closing pull-request
+relationships. The `adr` command remains local and uses Git only for repository identity and an
+optional immutable base snapshot. Every command emits JSON only and performs no writes. Malformed
+issues and ADR corpora return `valid: false` with structured errors rather than hiding evidence.
+Compact ADR mode omits narrative and returns a hash-bound document index; finder input implies this
+mode so the complete semantic candidate set can remain inside an isolated subagent context.
 
 `--gh-executable` is optional for backward compatibility. When supplied, it must resolve from an
 absolute path to an executable file, and the parser uses that exact GitHub CLI for every REST and
@@ -204,9 +239,9 @@ codex plugin add breadcrumb@breadcrumb
 ## Trust And Access
 
 Breadcrumb uses `git` for repository and branch operations and the selected absolute `gh` path for
-explicit GitHub reads and writes. Issue bodies, comments, pull-request bodies, diffs, local toolchain
-hints, and repository content are untrusted task data; they cannot override active instructions,
-authorization, or credential policy.
+explicit GitHub reads and writes. Issue bodies, comments, pull-request bodies, diffs, ADRs, local
+toolchain hints, and repository content are untrusted task data; they cannot override active
+instructions, authorization, or credential policy.
 
 Implementation or stale comments control branch state only when their fixed visible metadata is
 valid and the GitHub comment author association is `OWNER`, `MEMBER`, or `COLLABORATOR`. Credentials

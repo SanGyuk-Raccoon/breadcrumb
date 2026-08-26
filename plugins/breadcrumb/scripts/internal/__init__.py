@@ -2,6 +2,8 @@
 
 PROJECTION_VERSION = 1
 WORK_SCHEMA_VERSION = 1
+ADR_SCHEMA_VERSION = 1
 BREADCRUMB_LABEL = "breadcrumb"
 WORK_STATUSES = ("backlog", "in-progress", "complete")
+ADR_STATUSES = ("accepted", "superseded", "deprecated")
 TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
