@@ -4,6 +4,7 @@ import unittest
 
 from support import SCRIPT_ROOT
 
+from internal.adrs import parse_adr_bytes
 from internal.comments import parse_breadcrumb_comment, parse_update_comment
 from internal.documents import parse_work_body
 from internal.template_validation import (
@@ -17,12 +18,13 @@ PLUGIN_ROOT = SCRIPT_ROOT.parent
 
 
 class TemplateTests(unittest.TestCase):
-    def test_all_five_bundled_templates_are_valid(self) -> None:
+    def test_all_six_bundled_templates_are_valid(self) -> None:
         result = validate_bundled_templates(PLUGIN_ROOT)
         self.assertTrue(result["valid"], result["errors"])
-        self.assertEqual(len(result["templates"]), 5)
+        self.assertEqual(len(result["templates"]), 6)
         self.assertEqual(set(TEMPLATE_FILES), {
             "work",
+            "adr",
             "comment-implementation",
             "comment-implementation-stale",
             "comment-update",
@@ -61,6 +63,31 @@ class TemplateTests(unittest.TestCase):
         for source, target in replacements.items():
             rendered = rendered.replace(source, target)
         result = parse_work_body(rendered)
+        self.assertTrue(result.valid, result.errors)
+
+    def test_rendered_adr_template_matches_document_parser(self) -> None:
+        rendered = (PLUGIN_ROOT / "templates" / "adr.md").read_text(encoding="utf-8")
+        replacements = {
+            "<title>": "Use repository-local ADRs",
+            "<accepted-or-superseded-or-deprecated>": "accepted",
+            "<number>": "18",
+            "<none-or-sorted-adr-basenames>": "none",
+            "<summary>": "Keep decisions with code.",
+            "<context>": "The decision needs durable history.",
+            "<components-or-none>": "ADR projection",
+            "<paths-or-none>": ".breadcrumb/adr/**",
+            "<resources-or-none>": "Git repository",
+            "<behaviors-or-none>": "Planning and implementation",
+            "<decision>": "Track ADR files in Git.",
+            "<consequences>": "The repository gains documentation footprint.",
+            "<review-triggers>": "Cross-repository search becomes necessary.",
+        }
+        for source, target in replacements.items():
+            rendered = rendered.replace(source, target)
+        result = parse_adr_bytes(
+            ".breadcrumb/adr/18-repository-local-adrs.md",
+            rendered.encode("utf-8"),
+        )
         self.assertTrue(result.valid, result.errors)
 
     def test_rendered_implementation_template_matches_comment_parser(self) -> None:

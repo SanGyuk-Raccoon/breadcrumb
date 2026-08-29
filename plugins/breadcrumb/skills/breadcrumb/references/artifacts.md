@@ -6,6 +6,8 @@ the parser.
 ## Contents
 
 - [Work Issue](#work-issue)
+- [ADR](#adr)
+- [ADR Projection](#adr-projection)
 - [Legacy Report Migration Input](#legacy-report-migration-input)
 - [Parser Projection](#parser-projection)
 - [Implementation Comment](#implementation-comment)
@@ -51,6 +53,95 @@ End the body with exactly:
 
 Add no content after the status fields. Add no hidden state marker, Breadcrumb HTML signature,
 unknown status field, or repository-specific template content.
+
+## ADR
+
+Load `<plugin-root>/templates/adr.md`. Store rendered files only at
+`.breadcrumb/adr/<work-issue-number>-<decision-slug>.md`, where the issue number is a positive
+decimal integer and the slug is lowercase ASCII kebab-case. Render exactly this schema shape:
+
+```text
+# ADR: <title>
+
+- Schema Version: 1
+- Status: accepted|superseded|deprecated
+- Work Issue: #<positive-number>
+- Supersedes: none|<sorted-comma-space-separated-ADR-basenames>
+- Superseded By: none|<sorted-comma-space-separated-ADR-basenames>
+
+## Summary
+## Context
+## Affected Areas
+- Components: <non-empty-value-or-none>
+- Paths: <non-empty-value-or-none>
+- Resources: <non-empty-value-or-none>
+- Behaviors: <non-empty-value-or-none>
+## Decision
+## Consequences
+## Review Triggers
+```
+
+Keep headings in that exact order and do not add another visible level-one or level-two heading.
+Narrative may use level-three or deeper headings. Metadata fields and Affected Areas fields are fixed
+and ordered.
+Relationship values use basenames from the same corpus, without paths, duplicates, or unsorted
+entries. `superseded` requires at least one `Superseded By` value; `accepted` and `deprecated`
+require `Superseded By: none`. Every supersession relationship must be bidirectional and acyclic.
+
+## ADR Projection
+
+`breadcrumb.py adr` is a local read-only projection and has this stable top-level shape:
+
+```json
+{
+  "projection_version": 1,
+  "hostname": "github.com",
+  "repository": "owner/repository",
+  "valid": true,
+  "adr_corpus": {
+    "schema_version": 1,
+    "path": ".breadcrumb/adr",
+    "present": true,
+    "digest": "<lowercase-sha256>",
+    "total": 2,
+    "valid": true,
+    "errors": [],
+    "document_index": [],
+    "documents": [],
+    "finder_projection": []
+  },
+  "base": null,
+  "diff": null,
+  "finder_input": null,
+  "finder": null
+}
+```
+
+`document_index` contains every parsed candidate's path, content SHA-256, status, Work Issue,
+lifecycle relationships, and validity. `documents` contains path, title, content SHA-256, normalized
+metadata, complete section content, normalized Affected Areas, valid, and structured errors for every
+regular `.md` candidate. `finder_projection` contains every parsed candidate's path, content SHA-256,
+title, status, Work Issue, lifecycle relationships, Summary, Affected Areas, and Review Triggers. Use
+it for semantic search only when the corpus is valid. Never omit `superseded` or `deprecated`
+documents from a valid corpus.
+
+With `--compact`, `documents` and `finder_projection` are `null`; corpus metadata, errors,
+`document_index`, base, and diff remain available. `--finder-input-json` implies this compact output,
+and its ordered candidates appear only under `finder.candidates`. This prevents complete ADR
+narrative from entering the caller context before semantic delegation.
+
+With `--base`, `base` contains the requested ref, resolved commit, and compact base-corpus projection.
+`diff` contains valid, sorted added/modified/deleted paths, and structured errors. With a valid exact
+`--finder-input-json`, `finder_input` echoes the normalized compact input and `finder` is either
+`ready` with `coverage_target` and every deterministically ordered candidate including its content
+SHA-256, or `blocked` with no candidates when the corpus/base diff is invalid. Deterministic priority
+never filters a candidate. A base or digest mismatch is an operational failure rather than a partial
+projection.
+
+All ADR errors have `code`, `message`, and repository-relative `path`, plus `line` when known. A
+missing directory is `present: false`, total zero, and valid. Symlinks, nested paths, unsupported
+files, invalid UTF-8, malformed schema, broken or cyclic relationships, deletion, status regression,
+and removed lifecycle relationships make the applicable projection invalid.
 
 ## Legacy Report Migration Input
 

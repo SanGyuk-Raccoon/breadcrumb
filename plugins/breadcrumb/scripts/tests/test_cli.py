@@ -14,6 +14,7 @@ from support import SCRIPT_ROOT  # noqa: F401
 
 import breadcrumb
 from internal.cli import operational_error
+from internal.github import parse_target
 
 
 def invoke(arguments: list[str]) -> tuple[int, dict[str, object], str]:
@@ -75,6 +76,52 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(payload["issue"]["number"], 18)
             inspected.assert_called_once_with(mock.ANY, 18, comment_mode=mode)
+
+    def test_adr_projection_is_local_and_accepts_a_base_ref(self) -> None:
+        root = Path("/tmp/repository")
+        target = parse_target("github.example.test", "acme/widgets")
+        expected = {
+            "projection_version": 1,
+            "repository": "acme/widgets",
+            "valid": True,
+        }
+        with mock.patch.object(
+            breadcrumb,
+            "discover_repository",
+            return_value=(root, "origin", target),
+        ) as discovered, mock.patch.object(
+            breadcrumb, "project_adr_corpus", return_value=expected
+        ) as projected, mock.patch.object(breadcrumb, "resolve_repository") as resolved:
+            exit_code, payload, _ = invoke(
+                ["adr", "--compact", "--base", "origin/main"]
+            )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload, expected)
+        discovered.assert_called_once_with()
+        projected.assert_called_once_with(
+            root,
+            repository="acme/widgets",
+            hostname="github.example.test",
+            base_ref="origin/main",
+            finder_input=None,
+            compact=True,
+        )
+        resolved.assert_not_called()
+
+    def test_adr_finder_input_rejects_malformed_json(self) -> None:
+        root = Path("/tmp/repository")
+        target = parse_target("github.example.test", "acme/widgets")
+        with mock.patch.object(
+            breadcrumb,
+            "discover_repository",
+            return_value=(root, "origin", target),
+        ) as discovered:
+            exit_code, payload, _ = invoke(
+                ["adr", "--base", "main", "--finder-input-json", "not-json"]
+            )
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(payload["error"]["code"], "invalid_arguments")
+        discovered.assert_called_once_with()
 
     def test_inspect_rejects_unknown_comment_mode(self) -> None:
         exit_code, payload, _ = invoke(["inspect", "18", "--comments", "recent"])

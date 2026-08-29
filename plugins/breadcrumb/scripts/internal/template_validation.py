@@ -10,6 +10,7 @@ from .documents import HEADINGS, normalize_markdown
 
 TEMPLATE_FILES = {
     "work": "work.md",
+    "adr": "adr.md",
     "comment-implementation": "comment-implementation.md",
     "comment-implementation-stale": "comment-implementation-stale.md",
     "comment-update": "comment-update.md",
@@ -73,6 +74,33 @@ def validate_template(template_type: str, value: str) -> list[TemplateProblem]:
             )
         )
         return _require_exact_lines(lines, expected)
+    if template_type == "adr":
+        return _require_exact_lines(
+            lines,
+            [
+                "# ADR: <title>",
+                "- Schema Version: 1",
+                "- Status: <accepted-or-superseded-or-deprecated>",
+                "- Work Issue: #<number>",
+                "- Supersedes: <none-or-sorted-adr-basenames>",
+                "- Superseded By: <none-or-sorted-adr-basenames>",
+                "## Summary",
+                "<summary>",
+                "## Context",
+                "<context>",
+                "## Affected Areas",
+                "- Components: <components-or-none>",
+                "- Paths: <paths-or-none>",
+                "- Resources: <resources-or-none>",
+                "- Behaviors: <behaviors-or-none>",
+                "## Decision",
+                "<decision>",
+                "## Consequences",
+                "<consequences>",
+                "## Review Triggers",
+                "<review-triggers>",
+            ],
+        )
     if template_type == "comment-implementation":
         return _require_exact_lines(
             lines,

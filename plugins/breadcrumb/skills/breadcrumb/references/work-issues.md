@@ -46,6 +46,9 @@ read-only; an explicit init request does not approve migration side effects.
 4. Require `verification.md` to be tracked, unmodified, and published on the fetched default branch
    before implementation. Permit issue-only operations while it is missing, but report that
    implementation is not ready.
+5. Apply `adrs.md`. Treat a missing ADR directory as ready and do not create it. When the directory
+   exists, require a valid local ADR projection and report its digest, document count, and any
+   schema, safety, lifecycle, or base-diff failure separately from toolchain readiness.
 
 ### Plan And Confirm Toolchain Repair
 
@@ -92,10 +95,12 @@ read-only; an explicit init request does not approve migration side effects.
 
 1. Inventory `.breadcrumb/config.json`, `.breadcrumb/templates`, and every unsupported path contained
    by that directory without reading file bytes, loading template overrides, or following a symlink.
-   Exclude only `verification.md` and a local hint already recognized as safe and ignored by the
-   toolchain audit. Record the exact path, kind, containment, tracking, staged/unstaged state, and
-   whether the fetched default branch contains each artifact. Treat a tracked or published
-   `toolchain.local.json` as unsupported repository state and never load it as a tool hint.
+   Exclude `verification.md`, the exact `.breadcrumb/adr/` subtree handled by the ADR projection,
+   and a local hint already recognized as safe and ignored by the toolchain audit. Record the exact
+   path, kind, containment, tracking, staged/unstaged state, and whether the fetched default branch
+   contains each artifact. Treat an invalid ADR corpus as supported-but-broken state to diagnose,
+   not a legacy cleanup candidate. Treat a tracked or published `toolchain.local.json` as unsupported
+   repository state and never load it as a tool hint.
 2. Fully paginate repository labels and GitHub-open issues. Find issues carrying
    `breadcrumb:backlog`, `breadcrumb:requirement`, or `breadcrumb:design`, and independently find
    issue bodies matching a complete legacy Bug or Feature Request contract from `artifacts.md`.
@@ -179,7 +184,8 @@ the local hint or durable issue state.
 4. Choose initial Status from actual readiness: `backlog` when merely captured and not started,
    `in-progress` when refinement is active with unresolved Todo, or `complete` when the body is
    implementation-ready with none unresolved. Permit direct `backlog -> complete` when planning is
-   completed before publication.
+   completed before publication. Before publishing `complete`, apply the planning completion gate
+   in `adrs.md`; a backlog capture may defer ADR scope, search, disposition, and drafts.
 5. Render the fixed `work.md`, concise title, and exact `breadcrumb` label. When the user explicitly
    requested issue creation, that request authorizes the ordinary single POST. Otherwise show the
    complete proposal and wait for approval.
@@ -213,7 +219,12 @@ the local hint or durable issue state.
 3. Summarize identity, GitHub state, Status, Background, Goal, Requirements, Design, Verification,
    resolved and unresolved Todo, new comment decisions, requested and effective comment mode,
    checkpoint warnings, implementation current/stale state, branch, and linked PR.
-4. Name malformed or conflicting metadata and resulting uncertainty. An incremental safe fallback
+4. Run the compact local ADR projection without a semantic finder. Select ADRs whose indexed
+   `Work Issue` matches and expose only those full documents when narrative is needed. Summarize the
+   issue's recorded ADR disposition and search constraints, current ADR statuses, and lifecycle
+   relationships. Report an absent corpus normally and block conclusions that depend on an invalid
+   corpus.
+5. Name malformed or conflicting metadata and resulting uncertainty. An incremental safe fallback
    may repeat older comments but must not hide it. Offer only operations allowed by the current
    projection and do not perform one automatically.
 
@@ -237,7 +248,9 @@ the local hint or durable issue state.
    `open` operation.
 5. Keep Status and Todo consistent. A routine body update requested explicitly needs no second
    approval. Show and confirm a complete normalized replacement before repairing malformed schema
-   1 content. Stop without editing an unsupported future schema.
+   1 content. Stop without editing an unsupported future schema. Before a transition to `complete`,
+   apply the `adrs.md` planning completion gate and persist its scope, digest-bound search result,
+   disposition, and complete planned ADR changes in the issue.
 6. For `complete -> in-progress` with an existing implementation, perform one coordinated update:
    - show the final body, stale comment, and affected open PR;
    - obtain confirmation;
@@ -273,6 +286,9 @@ the local hint or durable issue state.
 2. Keep the operation read-only. For planning, review Background through Verification for clarity,
    cohesion, observable behavior, technical sufficiency, risks, and unresolved decisions. For
    implementation, review the actual diff and affected call paths against the durable issue.
-3. Lead with actionable findings ordered by severity. Cite issue headings, paths/lines, commits, or
+3. Run the ADR projection and apply the review checks in `adrs.md`. For planning, verify finder
+   coverage and disposition evidence. For implementation, compare the base diff, planned ADR paths,
+   lifecycle changes, actual behavior, and existing Decision immutability.
+4. Lead with actionable findings ordered by severity. Cite issue headings, paths/lines, commits, or
    diff locations. Distinguish fact, inference, unanswered question, and residual risk.
-4. Recommend `update` or implementation follow-up when appropriate, but persist nothing.
+5. Recommend `update` or implementation follow-up when appropriate, but persist nothing.

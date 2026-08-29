@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only Breadcrumb work issue projection CLI."""
+"""Read-only Breadcrumb work issue and ADR projection CLI."""
 
 from __future__ import annotations
 
@@ -30,9 +30,10 @@ import os
 from pathlib import Path
 
 from internal import WORK_STATUSES
+from internal.adrs import parse_finder_input_json, project_adr_corpus
 from internal.cli import JsonArgumentParser, operational_error, write_diagnostic, write_json
 from internal.errors import BreadcrumbOperationalError, CliUsageError
-from internal.github import resolve_repository
+from internal.github import discover_repository, resolve_repository
 from internal.projection import inspect_issue, list_issues
 
 
@@ -65,7 +66,7 @@ def _absolute_executable(value: str) -> str:
 
 
 def _parser() -> JsonArgumentParser:
-    parser = JsonArgumentParser(description="Inspect Breadcrumb work issues.")
+    parser = JsonArgumentParser(description="Inspect Breadcrumb work issues and ADRs.")
     parser.add_argument(
         "--gh-executable",
         type=_absolute_executable,
@@ -80,6 +81,23 @@ def _parser() -> JsonArgumentParser:
     inspect_parser = commands.add_parser("inspect", help="Inspect one work issue.")
     inspect_parser.add_argument("issue_number", type=_positive_issue_number)
     inspect_parser.add_argument("--comments", choices=("incremental", "all"))
+
+    adr_parser = commands.add_parser(
+        "adr", help="Project the repository-local Breadcrumb ADR corpus."
+    )
+    adr_parser.add_argument(
+        "--base",
+        help="Optional Git ref used for structural ADR lifecycle diff validation.",
+    )
+    adr_parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Return only the ADR index, corpus metadata, and structural diff.",
+    )
+    adr_parser.add_argument(
+        "--finder-input-json",
+        help="Exact compact planning input used to rank every ADR without filtering.",
+    )
     return parser
 
 
@@ -88,14 +106,30 @@ def main(argv: list[str] | None = None) -> int:
         return _unsupported_runtime()
     try:
         arguments = _parser().parse_args(argv)
-        _, client = resolve_repository(gh_executable=arguments.gh_executable)
+        if arguments.command == "adr":
+            root, _, target = discover_repository()
+            finder_input = (
+                parse_finder_input_json(arguments.finder_input_json)
+                if arguments.finder_input_json is not None
+                else None
+            )
+            payload = project_adr_corpus(
+                root,
+                repository=target.identity,
+                hostname=target.hostname,
+                base_ref=arguments.base,
+                finder_input=finder_input,
+                compact=arguments.compact,
+            )
+        else:
+            _, client = resolve_repository(gh_executable=arguments.gh_executable)
         if arguments.command == "list":
             payload = list_issues(
                 client,
                 status_filter=arguments.status,
                 include_closed=arguments.include_closed,
             )
-        else:
+        elif arguments.command == "inspect":
             payload = inspect_issue(
                 client,
                 arguments.issue_number,

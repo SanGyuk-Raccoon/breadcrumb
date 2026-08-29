@@ -1,15 +1,15 @@
 {
   "name": "breadcrumb",
-  "version": "0.2.0+codex.20260810141029",
-  "description": "Durable GitHub work issues, asynchronous decisions, and product reporting",
+  "version": "0.2.0+codex.20260826164034",
+  "description": "Durable GitHub work issues, repository-local ADRs, asynchronous decisions, and product reporting",
   "author": {
     "name": "Breadcrumb contributors"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Breadcrumb",
-    "shortDescription": "Durable GitHub work, decisions, and product reporting.",
-    "longDescription": "Plan, decide asynchronously through issue comments, implement, verify, and publish cohesive work through durable GitHub issues, and capture privacy-minimized Breadcrumb product reports as backlog work.",
+    "shortDescription": "Durable GitHub work, local ADRs, decisions, and reporting.",
+    "longDescription": "Plan, search repository-local ADRs, decide asynchronously through issue comments, implement, verify, and publish cohesive work through durable GitHub issues, and capture privacy-minimized Breadcrumb product reports as backlog work.",
     "developerName": "Breadcrumb contributors",
     "category": "Productivity",
     "capabilities": [
