@@ -1,0 +1,4 @@
+interface:
+  display_name: "Read"
+  short_description: "Read and review durable Breadcrumb workflow state"
+  default_prompt: "Use $read to load and review the current Breadcrumb work issue."

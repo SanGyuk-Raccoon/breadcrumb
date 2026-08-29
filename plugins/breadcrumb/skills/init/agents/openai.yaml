@@ -1,0 +1,4 @@
+interface:
+  display_name: "Initialize"
+  short_description: "Initialize, audit, or migrate a Breadcrumb repository"
+  default_prompt: "Use $init to audit and initialize this repository for Breadcrumb."

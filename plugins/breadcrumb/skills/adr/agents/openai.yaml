@@ -1,0 +1,4 @@
+interface:
+  display_name: "ADR"
+  short_description: "Implement and record a planned ADR-only repository change"
+  default_prompt: "Use $adr to implement the planned ADR-only change for this issue."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Issue"
+  short_description: "Create and refine one durable Breadcrumb work issue"
+  default_prompt: "Use $issue to capture and refine this work in a Breadcrumb issue."

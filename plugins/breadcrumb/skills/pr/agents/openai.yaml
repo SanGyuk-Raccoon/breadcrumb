@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pull Request"
+  short_description: "Publish the pull request for a verified Breadcrumb implementation"
+  default_prompt: "Use $pr to publish the pull request for the current Breadcrumb implementation."

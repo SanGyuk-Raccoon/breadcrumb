@@ -1,15 +1,15 @@
 {
   "name": "breadcrumb",
-  "version": "0.2.0+codex.20260826164034",
-  "description": "Durable GitHub work issues, repository-local ADRs, asynchronous decisions, and product reporting",
+  "version": "0.3.0+codex.20260829090256",
+  "description": "Operation-scoped GitHub work issues, repository-local ADRs, delivery, and product reporting",
   "author": {
     "name": "Breadcrumb contributors"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Breadcrumb",
-    "shortDescription": "Durable GitHub work, local ADRs, decisions, and reporting.",
-    "longDescription": "Plan, search repository-local ADRs, decide asynchronously through issue comments, implement, verify, and publish cohesive work through durable GitHub issues, and capture privacy-minimized Breadcrumb product reports as backlog work.",
+    "shortDescription": "Focused skills for durable GitHub work, ADRs, and delivery.",
+    "longDescription": "Use separate initialization, read, issue, ADR, implementation, pull-request, and reporting skills to plan, verify, and deliver cohesive work through durable GitHub issues and repository-local decisions.",
     "developerName": "Breadcrumb contributors",
     "category": "Productivity",
     "capabilities": [
@@ -18,11 +18,9 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Initialize this repository for Breadcrumb.",
-      "Capture this work in one Breadcrumb issue.",
-      "Continue the current Breadcrumb work issue.",
-      "Load new decisions from the current issue comments.",
-      "Report a Breadcrumb bug or feature request from this conversation."
+      "Capture and refine this work in one Breadcrumb issue.",
+      "Implement and verify the selected Breadcrumb work issue.",
+      "Publish the pull request for the current implementation."
     ]
   }
 }
