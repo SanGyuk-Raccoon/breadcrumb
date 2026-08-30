@@ -35,6 +35,94 @@ class WorkDocumentTests(unittest.TestCase):
         self.assertTrue(empty.valid)
         self.assertTrue(mixed.valid)
 
+    def test_todo_items_are_structured_with_canonical_ids(self) -> None:
+        body = work_body(
+            "in-progress",
+            ["- [ ] T1: Choose the retry policy.", "- [X] T2: Confirm the limit."],
+        )
+        result = parse_work_body(body)
+        lines = body.splitlines()
+
+        self.assertTrue(result.valid, result.errors)
+        self.assertEqual(result.warnings, ())
+        self.assertEqual(
+            [item.as_dict() for item in result.items],
+            [
+                {
+                    "id": "T1",
+                    "checked": False,
+                    "text": "Choose the retry policy.",
+                    "line": lines.index("- [ ] T1: Choose the retry policy.") + 1,
+                },
+                {
+                    "id": "T2",
+                    "checked": True,
+                    "text": "Confirm the limit.",
+                    "line": lines.index("- [X] T2: Confirm the limit.") + 1,
+                },
+            ],
+        )
+        self.assertEqual(
+            result.projection()["todo"]["items"],
+            [item.as_dict() for item in result.items],
+        )
+
+    def test_duplicate_todo_id_is_an_error(self) -> None:
+        body = work_body(
+            "in-progress",
+            ["- [ ] T1: Choose the policy.", "- [x] T1: Confirm the policy."],
+        )
+        result = parse_work_body(body)
+        duplicate = next(
+            item for item in result.errors if item.code == "duplicate_todo_id"
+        )
+
+        self.assertFalse(result.valid)
+        self.assertEqual(
+            duplicate.line,
+            body.splitlines().index("- [x] T1: Confirm the policy.") + 1,
+        )
+        self.assertEqual(result.warnings, ())
+
+    def test_todo_without_id_remains_valid_with_warning(self) -> None:
+        body = work_body("backlog", ["- [ ] Legacy Todo."])
+        result = parse_work_body(body)
+
+        self.assertTrue(result.valid, result.errors)
+        self.assertEqual(
+            result.items[0].as_dict(),
+            {
+                "id": None,
+                "checked": False,
+                "text": "Legacy Todo.",
+                "line": body.splitlines().index("- [ ] Legacy Todo.") + 1,
+            },
+        )
+        self.assertEqual(
+            [warning.as_dict() for warning in result.warnings],
+            [
+                {
+                    "code": "missing_todo_id",
+                    "message": (
+                        "Todo item does not start with a canonical "
+                        "T<number>: identifier"
+                    ),
+                    "line": body.splitlines().index("- [ ] Legacy Todo.") + 1,
+                }
+            ],
+        )
+
+    def test_non_positive_or_padded_todo_id_is_not_canonical(self) -> None:
+        for item in ("- [ ] T0: Invalid ID.", "- [ ] T01: Padded ID."):
+            with self.subTest(item=item):
+                result = parse_work_body(work_body("backlog", [item]))
+                self.assertTrue(result.valid, result.errors)
+                self.assertIsNone(result.items[0].id)
+                self.assertEqual(
+                    {warning.code for warning in result.warnings},
+                    {"missing_todo_id"},
+                )
+
     def test_heading_contract_is_fixed(self) -> None:
         body = work_body("complete")
         variants = (
@@ -57,7 +145,7 @@ class WorkDocumentTests(unittest.TestCase):
         self.assertEqual(result.unresolved, 0)
 
     def test_decision_brief_and_stable_todo_id_fit_schema_one(self) -> None:
-        body = work_body("in-progress", ["- [ ] T1 — Choose the retry policy."])
+        body = work_body("in-progress", ["- [ ] T1: Choose the retry policy."])
         body = body.replace(
             "Use the existing component.",
             "### Decision Briefs\n\n#### T1 — Retry policy\n\n"
@@ -71,7 +159,7 @@ class WorkDocumentTests(unittest.TestCase):
         self.assertEqual(result.unresolved, 1)
 
     def test_todo_accepts_uppercase_checked_but_rejects_prose(self) -> None:
-        checked = parse_work_body(work_body("complete", ["- [X] Done."]))
+        checked = parse_work_body(work_body("complete", ["- [X] T1: Done."]))
         prose = parse_work_body(work_body("in-progress", ["Decide this."]))
         self.assertTrue(checked.valid)
         self.assertIn("invalid_todo", {item.code for item in prose.errors})

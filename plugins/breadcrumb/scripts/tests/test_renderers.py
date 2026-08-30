@@ -37,6 +37,8 @@ class ArtifactRendererTests(unittest.TestCase):
         )
         parsed = parse_work_body(result["body"])
         self.assertTrue(parsed.valid, parsed.errors)
+        self.assertEqual(parsed.items[0].id, "T1")
+        self.assertEqual(parsed.warnings, ())
         self.assertEqual(result["labels"], ["breadcrumb"])
         self.assertEqual(result["todo"], {"resolved": 1, "unresolved": 0})
 

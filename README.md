@@ -30,9 +30,9 @@ backlog -> in-progress -> complete
 - A merged closing PR completes delivery and closes the issue. Body Status remains `complete`.
 
 Meaningful completed Todo remains checked as durable decision history. New or rewritten Todo uses a
-stable `T<number>` identifier. Decision-bearing Todo has a matching Decision Brief with real options,
-tradeoffs, recommendation, uncertainty, and a reply example. Requirement/design changes after an
-implementation mark it stale and return the issue to `in-progress`.
+stable `T<number>:` identifier. Decision-bearing Todo has a matching Decision Brief with real
+options, tradeoffs, recommendation, uncertainty, and a reply example. Requirement/design changes
+after an implementation mark it stale and return the issue to `in-progress`.
 
 ## Skills
 
@@ -111,7 +111,10 @@ Every work issue uses exactly the `breadcrumb` label and these fixed visible hea
 ## Breadcrumb Status
 ```
 
-Only final Status metadata and Todo checkboxes are machine parsed:
+Final Status metadata, Todo checkboxes, and canonical `T[1-9][0-9]*:` Todo identifiers are
+machine parsed. Projections preserve the existing resolved/unresolved counts and add each item's ID,
+checked state, text, and source line. Existing items without an ID remain valid and produce a
+non-blocking warning instead of requiring bulk migration:
 
 ```markdown
 ## Breadcrumb Status

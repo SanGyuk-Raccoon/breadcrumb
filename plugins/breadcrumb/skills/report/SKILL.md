@@ -95,7 +95,7 @@ Feature Request requires `report_type`, `title`, `problem_or_opportunity`, `desi
 Accept only exact title, `labels: ["breadcrumb"]`, Status `backlog`, and one unresolved Todo:
 
 ```text
-- [ ] 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다.
+- [ ] T1: 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다.
 ```
 
 Do not add bug/enhancement/type/phase labels or teach current projection scripts a legacy shape.

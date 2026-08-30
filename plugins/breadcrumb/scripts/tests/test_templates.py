@@ -57,7 +57,7 @@ class TemplateTests(unittest.TestCase):
             "<requirements>": "- Required behavior.",
             "<design>": "Use the existing component.",
             "<verification>": "Run unit tests.",
-            "<todo>": "- [x] Planning completed.",
+            "<todo>": "- [x] T1: Planning completed.",
             "<backlog-or-in-progress-or-complete>": "complete",
         }
         for source, target in replacements.items():

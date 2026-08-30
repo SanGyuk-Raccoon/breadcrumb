@@ -73,7 +73,7 @@ in place. Convert an undelivered exact legacy report into schema-1 `backlog` wit
 and this Todo:
 
 ```text
-- [ ] 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다.
+- [ ] T1: 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다.
 ```
 
 When a merged PR already delivered it, propose closure using that evidence. Ask separately before
