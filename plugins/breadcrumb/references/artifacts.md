@@ -78,7 +78,9 @@ the same corpus, unique and sorted. `superseded` requires `Superseded By`; `acce
 
 `render_adr.py` accepts `issue_number`, `slug`, `title`, `status`, `supersedes`, `superseded_by`,
 the five narrative fields, and `affected_areas` arrays for components, paths, resources, and
-behaviors. It returns the validated repository-relative `path` and `body` but never writes the file.
+behaviors. Each relationship item must be one valid ADR basename. Each affected-area item must not
+contain a comma or equal the exact lowercase sentinel `none`; other capitalization is ordinary data.
+It returns the validated repository-relative `path` and `body` but never writes the file.
 
 ## Projection JSON
 

@@ -8,7 +8,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from . import ADR_STATUSES, BREADCRUMB_LABEL, WORK_STATUSES
-from .adrs import parse_adr_bytes
+from .adrs import is_valid_adr_basename, parse_adr_bytes
 from .comments import parse_breadcrumb_comment, parse_branch, parse_update_comment
 from .documents import normalize_markdown, parse_work_body
 from .template_validation import validate_template
@@ -236,8 +236,15 @@ def render_adr(payload: dict[str, Any]) -> dict[str, object]:
     status = _text(payload, "status", one_line=True)
     if status not in ADR_STATUSES:
         raise ValueError("status must be accepted, superseded, or deprecated")
-    supersedes = sorted(_string_list(payload, "supersedes"))
-    superseded_by = sorted(_string_list(payload, "superseded_by"))
+    def relationship_values(key: str) -> list[str]:
+        values = _string_list(payload, key)
+        for index, value in enumerate(values):
+            if not is_valid_adr_basename(value):
+                raise ValueError(f"{key}[{index}] must be one valid ADR basename")
+        return sorted(values)
+
+    supersedes = relationship_values("supersedes")
+    superseded_by = relationship_values("superseded_by")
     affected = payload.get("affected_areas")
     if not isinstance(affected, dict):
         raise ValueError("affected_areas must be an object")
@@ -248,6 +255,15 @@ def render_adr(payload: dict[str, Any]) -> dict[str, object]:
 
     def affected_value(key: str) -> str:
         values = _string_list(affected, key)
+        for index, value in enumerate(values):
+            if "," in value:
+                raise ValueError(
+                    f"affected_areas.{key}[{index}] must not contain a comma"
+                )
+            if value == "none":
+                raise ValueError(
+                    f"affected_areas.{key}[{index}] must not use reserved value none"
+                )
         return ", ".join(values) if values else "none"
 
     path = f".breadcrumb/adr/{issue_number}-{slug}.md"

@@ -51,6 +51,12 @@ _COMMIT_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 GitRunner = Callable[..., subprocess.CompletedProcess[bytes]]
 
 
+def is_valid_adr_basename(value: str) -> bool:
+    """Return whether value is one schema 1 ADR basename."""
+
+    return _FILENAME_RE.fullmatch(value) is not None
+
+
 @dataclass(frozen=True)
 class FinderInput:
     work_issue_number: int
@@ -338,7 +344,7 @@ def _parse_relation(
     if value == "none":
         return ()
     items = value.split(", ")
-    if any(not _FILENAME_RE.fullmatch(item) for item in items):
+    if any(not is_valid_adr_basename(item) for item in items):
         _add_problem(
             problems,
             "invalid_relation",
@@ -1160,7 +1166,7 @@ def _compare_snapshots(base: _Snapshot, current: _Snapshot) -> dict[str, object]
 
 
 def _affected_values(value: str) -> tuple[str, ...]:
-    if value.strip().casefold() == "none":
+    if value.strip() == "none":
         return ()
     return tuple(item.strip() for item in value.split(",") if item.strip())
 

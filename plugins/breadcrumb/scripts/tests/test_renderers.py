@@ -21,6 +21,28 @@ REPOSITORY_URL = "https://github.com/acme/widgets"
 COMMIT = "a" * 40
 
 
+def adr_payload() -> dict[str, object]:
+    return {
+        "issue_number": 29,
+        "slug": "operation-scoped-skills",
+        "title": "Use operation-scoped skills",
+        "status": "accepted",
+        "supersedes": [],
+        "superseded_by": [],
+        "summary": "Split the public workflow by operation.",
+        "context": "The umbrella skill mixes unrelated authority.",
+        "affected_areas": {
+            "components": ["plugin skills"],
+            "paths": ["plugins/breadcrumb/skills/**"],
+            "resources": ["GitHub work issues"],
+            "behaviors": ["skill selection"],
+        },
+        "decision": "Expose seven independent skills.",
+        "consequences": "Each skill loads less unrelated context.",
+        "review_triggers": "The host stops namespacing plugin skills.",
+    }
+
+
 class ArtifactRendererTests(unittest.TestCase):
     def test_work_issue_renderer_produces_one_valid_complete_issue(self) -> None:
         result = render_work_issue(
@@ -59,30 +81,35 @@ class ArtifactRendererTests(unittest.TestCase):
             render_work_issue({**base, "goal": "## Breadcrumb Status"})
 
     def test_adr_renderer_produces_one_valid_document(self) -> None:
-        result = render_adr(
-            {
-                "issue_number": 29,
-                "slug": "operation-scoped-skills",
-                "title": "Use operation-scoped skills",
-                "status": "accepted",
-                "supersedes": [],
-                "superseded_by": [],
-                "summary": "Split the public workflow by operation.",
-                "context": "The umbrella skill mixes unrelated authority.",
-                "affected_areas": {
-                    "components": ["plugin skills"],
-                    "paths": ["plugins/breadcrumb/skills/**"],
-                    "resources": ["GitHub work issues"],
-                    "behaviors": ["skill selection"],
-                },
-                "decision": "Expose seven independent skills.",
-                "consequences": "Each skill loads less unrelated context.",
-                "review_triggers": "The host stops namespacing plugin skills.",
-            }
-        )
+        result = render_adr(adr_payload())
         parsed = parse_adr_bytes(result["path"], result["body"].encode("utf-8"))
         self.assertTrue(parsed.valid, parsed.errors)
         self.assertEqual(result["path"], ".breadcrumb/adr/29-operation-scoped-skills.md")
+
+    def test_adr_renderer_rejects_ambiguous_affected_area_values(self) -> None:
+        for key in ("components", "paths", "resources", "behaviors"):
+            with self.subTest(key=key, value="comma"):
+                payload = adr_payload()
+                payload["affected_areas"][key] = ["alpha, beta"]
+                with self.assertRaisesRegex(ValueError, "must not contain a comma"):
+                    render_adr(payload)
+
+            with self.subTest(key=key, value="none"):
+                payload = adr_payload()
+                payload["affected_areas"][key] = ["none"]
+                with self.assertRaisesRegex(ValueError, "reserved value none"):
+                    render_adr(payload)
+
+    def test_adr_renderer_rejects_invalid_relationship_items(self) -> None:
+        for key in ("supersedes", "superseded_by"):
+            for value in ("1-a.md, 2-b.md", "not-an-adr"):
+                with self.subTest(key=key, value=value):
+                    payload = adr_payload()
+                    payload[key] = [value]
+                    with self.assertRaisesRegex(
+                        ValueError, "must be one valid ADR basename"
+                    ):
+                        render_adr(payload)
 
     def test_adr_renderer_keeps_the_two_relationship_fields_distinct(self) -> None:
         result = render_adr(
@@ -110,6 +137,9 @@ class ArtifactRendererTests(unittest.TestCase):
             "- Supersedes: 19-old-a.md, 20-old-b.md\n- Superseded By: none",
             result["body"],
         )
+        parsed = parse_adr_bytes(result["path"], result["body"].encode("utf-8"))
+        self.assertTrue(parsed.valid, parsed.errors)
+        self.assertEqual(parsed.supersedes, ("19-old-a.md", "20-old-b.md"))
 
     def test_implementation_renderer_matches_the_comment_parser(self) -> None:
         result = render_implementation_comment(
