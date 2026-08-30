@@ -53,7 +53,7 @@ class ArtifactRendererTests(unittest.TestCase):
                 "requirements": "- Preserve artifact schemas.",
                 "design": "Use shared internal modules.",
                 "verification": "Run the full unit test suite.",
-                "todo": ["- [x] T1: Confirm the design."],
+                "todo": ["- [x] T1: Action: Confirm the design."],
                 "status": "complete",
             }
         )
@@ -63,6 +63,51 @@ class ArtifactRendererTests(unittest.TestCase):
         self.assertEqual(parsed.warnings, ())
         self.assertEqual(result["labels"], ["breadcrumb"])
         self.assertEqual(result["todo"], {"resolved": 1, "unresolved": 0})
+
+    def test_work_issue_renderer_enforces_complete_core_sections(self) -> None:
+        base = {
+            "title": "Ready plan",
+            "background": "Observed behavior.",
+            "goal": "Observable outcome.",
+            "requirements": "- Required behavior.",
+            "design": "Use the existing component.",
+            "verification": "Run unit tests.",
+            "todo": ["- [x] T1: Action: Finish planning."],
+            "status": "complete",
+        }
+        for key in ("background", "goal", "requirements", "design", "verification"):
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(ValueError, "empty_required_section"):
+                    render_work_issue({**base, key: ""})
+        with self.assertRaisesRegex(ValueError, "placeholder_required_section"):
+            render_work_issue({**base, "background": "TBD"})
+
+    def test_work_issue_renderer_round_trips_decision_brief_contract(self) -> None:
+        payload = {
+            "title": "Choose a retry policy",
+            "background": "Retries are inconsistent.",
+            "goal": "Select one bounded policy.",
+            "requirements": "- Preserve idempotency.",
+            "design": (
+                "#### T1 — Retry policy\n\n"
+                "- Why: callers need one policy.\n"
+                "- Options: retry three or five times.\n"
+                "- Recommendation: retry three times.\n"
+                "- Uncertainty: production failure rates are not measured.\n"
+                "- Reply example: `T1: three retries`."
+            ),
+            "verification": "Exercise retry exhaustion.",
+            "todo": ["- [ ] T1: Decision: Choose the retry limit."],
+            "status": "in-progress",
+        }
+        result = render_work_issue(payload)
+        parsed = parse_work_body(result["body"])
+
+        self.assertTrue(parsed.valid, parsed.errors)
+        self.assertEqual(parsed.warnings, ())
+        self.assertEqual(parsed.items[0].text, "Decision: Choose the retry limit.")
+        with self.assertRaisesRegex(ValueError, "missing_decision_brief"):
+            render_work_issue({**payload, "design": "Use bounded retries."})
 
     def test_work_issue_renderer_rejects_invalid_status_and_heading_injection(self) -> None:
         base = {

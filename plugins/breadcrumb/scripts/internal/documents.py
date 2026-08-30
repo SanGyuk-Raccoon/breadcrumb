@@ -17,14 +17,46 @@ HEADINGS = (
     "## Todo",
     "## Breadcrumb Status",
 )
+NARRATIVE_HEADINGS = HEADINGS[:5]
 TODO_HEADING = "## Todo"
 STATUS_HEADING = "## Breadcrumb Status"
 
 _LEVEL_TWO_HEADING_RE = re.compile(r"^##(?:\s|$).*$")
+_UP_TO_LEVEL_FOUR_HEADING_RE = re.compile(r"^#{1,4}(?:\s|$).*$")
 _FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(?:.*)$")
 _TASK_RE = re.compile(r"^- \[([ xX])\] (\S(?:.*\S)?)$")
 _TODO_ID_RE = re.compile(r"^(T[1-9][0-9]*): +(\S(?:.*\S)?)$")
+_TODO_KIND_RE = re.compile(r"^(Decision|Action): +(\S(?:.*\S)?)$")
+_DECISION_BRIEF_HEADING_RE = re.compile(
+    r"^#### +(T[1-9][0-9]*) +— +(\S(?:.*\S)?)$"
+)
+_DECISION_BRIEF_FIELD_RE = re.compile(
+    r"^- (Why|Options|Recommendation|Uncertainty|Reply example):(?: +(.*))?$"
+)
 _FIELD_RE = re.compile(r"^- ([A-Za-z][A-Za-z ]*): (\S(?:.*\S)?)$")
+
+_DECISION_BRIEF_FIELDS = (
+    "Why",
+    "Options",
+    "Recommendation",
+    "Uncertainty",
+    "Reply example",
+)
+_COMPLETE_SECTION_PLACEHOLDERS = frozenset(
+    {
+        "<background>",
+        "<goal>",
+        "<requirements>",
+        "<design>",
+        "<verification>",
+        "tbd",
+        "todo",
+        "unknown",
+        "pending",
+        "none",
+        "n/a",
+    }
+)
 
 
 def normalize_markdown(value: str) -> str:
@@ -107,9 +139,9 @@ def _problem(
         problems.append(candidate)
 
 
-def _heading_positions(
-    lines: list[str], problems: list[DocumentError]
-) -> dict[str, int]:
+def _visible_lines(lines: list[str]) -> list[bool]:
+    """Return which lines are outside Markdown fenced code blocks."""
+
     visible: list[bool] = []
     fence_character: str | None = None
     fence_length = 0
@@ -135,7 +167,12 @@ def _heading_positions(
             ):
                 fence_character = None
                 fence_length = 0
+    return visible
 
+
+def _heading_positions(
+    lines: list[str], visible: list[bool], problems: list[DocumentError]
+) -> dict[str, int]:
     positions: dict[str, int] = {}
     expected = set(HEADINGS)
     for heading in HEADINGS:
@@ -245,8 +282,140 @@ def _parse_todo(
                 )
             else:
                 seen_ids.add(identifier)
+            if _TODO_KIND_RE.fullmatch(text) is None:
+                warnings.append(
+                    DocumentWarning(
+                        "missing_todo_kind",
+                        "Todo item does not declare Decision: or Action: after its canonical ID",
+                        index + 1,
+                    )
+                )
         items.append(TodoItem(identifier, checked, text, index + 1))
     return resolved, unresolved, tuple(items), tuple(warnings)
+
+
+def _validate_complete_sections(
+    lines: list[str], positions: dict[str, int], problems: list[DocumentError]
+) -> None:
+    if any(heading not in positions for heading in HEADINGS):
+        return
+    for heading, following in zip(
+        NARRATIVE_HEADINGS, HEADINGS[1 : len(NARRATIVE_HEADINGS) + 1], strict=True
+    ):
+        start = positions[heading] + 1
+        end = positions[following]
+        content = "\n".join(lines[start:end]).strip()
+        section = heading.removeprefix("## ")
+        if not content:
+            _problem(
+                problems,
+                "empty_required_section",
+                f"complete requires non-empty {section} content",
+                positions[heading] + 1,
+            )
+        elif content.casefold() in _COMPLETE_SECTION_PLACEHOLDERS:
+            line = next(
+                (index + 1 for index in range(start, end) if lines[index].strip()),
+                positions[heading] + 1,
+            )
+            _problem(
+                problems,
+                "placeholder_required_section",
+                f"complete {section} content is a reserved placeholder",
+                line,
+            )
+
+
+def _decision_briefs(
+    lines: list[str], positions: dict[str, int], visible: list[bool]
+) -> dict[str, list[tuple[int, dict[str, list[tuple[str, int]]]]]]:
+    briefs: dict[str, list[tuple[int, dict[str, list[tuple[str, int]]]]]] = {}
+    if any(heading not in positions for heading in HEADINGS):
+        return briefs
+
+    for heading, following in zip(
+        NARRATIVE_HEADINGS, HEADINGS[1 : len(NARRATIVE_HEADINGS) + 1], strict=True
+    ):
+        index = positions[heading] + 1
+        end = positions[following]
+        while index < end:
+            match = (
+                _DECISION_BRIEF_HEADING_RE.fullmatch(lines[index])
+                if visible[index]
+                else None
+            )
+            if match is None:
+                index += 1
+                continue
+
+            identifier = match.group(1)
+            heading_line = index + 1
+            fields: dict[str, list[tuple[str, int]]] = {}
+            index += 1
+            while index < end:
+                if visible[index] and _UP_TO_LEVEL_FOUR_HEADING_RE.fullmatch(
+                    lines[index]
+                ):
+                    break
+                field_match = (
+                    _DECISION_BRIEF_FIELD_RE.fullmatch(lines[index])
+                    if visible[index]
+                    else None
+                )
+                if field_match is not None:
+                    name, value = field_match.groups()
+                    fields.setdefault(name, []).append(((value or "").strip(), index + 1))
+                index += 1
+            briefs.setdefault(identifier, []).append((heading_line, fields))
+    return briefs
+
+
+def _validate_decision_briefs(
+    lines: list[str],
+    positions: dict[str, int],
+    visible: list[bool],
+    items: tuple[TodoItem, ...],
+    problems: list[DocumentError],
+) -> None:
+    briefs = _decision_briefs(lines, positions, visible)
+    for item in items:
+        if item.checked or item.id is None:
+            continue
+        kind = _TODO_KIND_RE.fullmatch(item.text)
+        if kind is None or kind.group(1) != "Decision":
+            continue
+
+        matches = briefs.get(item.id, [])
+        if not matches:
+            _problem(
+                problems,
+                "missing_decision_brief",
+                f"unresolved Decision Todo {item.id} requires a same-ID Decision Brief",
+                item.line,
+            )
+            continue
+        if len(matches) > 1:
+            _problem(
+                problems,
+                "duplicate_decision_brief",
+                f"Decision Brief ID {item.id} appears more than once",
+                matches[1][0],
+            )
+            continue
+
+        heading_line, fields = matches[0]
+        malformed = [
+            name
+            for name in _DECISION_BRIEF_FIELDS
+            if len(fields.get(name, [])) != 1 or not fields[name][0][0]
+        ]
+        if malformed:
+            _problem(
+                problems,
+                "invalid_decision_brief",
+                f"Decision Brief {item.id} requires one non-empty {', '.join(malformed)} field",
+                heading_line,
+            )
 
 
 def _parse_status(
@@ -349,9 +518,12 @@ def parse_work_body(body: object) -> WorkDocument:
         return WorkDocument(None, None, 0, 0, (), (), tuple(problems))
 
     lines = normalize_markdown(body).split("\n")
-    positions = _heading_positions(lines, problems)
+    visible = _visible_lines(lines)
+    positions = _heading_positions(lines, visible, problems)
     resolved, unresolved, items, warnings = _parse_todo(lines, positions, problems)
     schema_version, status = _parse_status(lines, positions, problems)
+
+    _validate_decision_briefs(lines, positions, visible, items, problems)
 
     if status == "in-progress" and unresolved == 0:
         _problem(
@@ -365,6 +537,8 @@ def parse_work_body(body: object) -> WorkDocument:
             "status_todo_mismatch",
             "complete requires zero unresolved Todo items",
         )
+    if status == "complete":
+        _validate_complete_sections(lines, positions, problems)
 
     return WorkDocument(
         schema_version,

@@ -45,9 +45,15 @@ class ReportRendererTests(unittest.TestCase):
         )[0]
         self.assertEqual(
             [line for line in todo.splitlines() if line],
-            ["- [ ] T1: 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다."],
+            [
+                "- [ ] T1: Action: 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다."
+            ],
         )
         self.assertEqual(parsed.items[0].id, "T1")
+        self.assertEqual(
+            parsed.items[0].text,
+            "Action: 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다.",
+        )
         self.assertEqual(parsed.warnings, ())
         self.assertIn("### Report Type\n\nBug", result["body"])
         self.assertIn("### Expected Behavior", result["body"])

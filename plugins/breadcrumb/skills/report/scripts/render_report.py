@@ -18,7 +18,7 @@ from internal.documents import normalize_markdown  # noqa: E402
 from internal.rendering import render_work_issue  # noqa: E402
 
 
-TODO = "- [ ] T1: 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다."
+TODO = "- [ ] T1: Action: 보고 내용을 구현 가능한 요구사항, 설계와 검증 계획으로 정제한다."
 CONTROL_FIELD_RE = re.compile(
     r"^ {0,3}- (?:Schema Version|Status|Branch|Verified Commit|Verification|"
     r"Previous Implementation|Reason):(?:\s|$)"
