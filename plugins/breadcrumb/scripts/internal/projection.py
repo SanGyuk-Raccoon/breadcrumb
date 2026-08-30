@@ -35,6 +35,7 @@ class ProjectionError:
 
 
 CommentMode = Literal["incremental", "all"]
+ProjectionDetail = Literal["compact", "detailed"]
 _COMMENT_PREFIX_DOMAIN = b"Breadcrumb Comment Prefix v1\0"
 EMPTY_COMMENT_PREFIX_SHA256 = hashlib.sha256(_COMMENT_PREFIX_DOMAIN).hexdigest()
 _GITHUB_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -64,6 +65,12 @@ class _Comment:
             "author_association": self.author_association,
             "body": self.body,
         }
+
+
+@dataclass(frozen=True)
+class _SelectedImplementation:
+    comment: _Comment
+    artifact: CommentArtifact
 
 
 def _positive_number(value: object, description: str) -> int:
@@ -179,8 +186,8 @@ def _latest_implementation(
     comments: Sequence[_Comment],
     issue_number: int,
     repository_url: str,
-) -> tuple[CommentArtifact | None, ProjectionError | None]:
-    valid: list[tuple[tuple[str, int], CommentArtifact]] = []
+) -> tuple[_SelectedImplementation | None, ProjectionError | None]:
+    valid: list[tuple[tuple[str, int], _SelectedImplementation]] = []
     invalid_candidate = False
     untrusted_candidate = False
     for comment in comments:
@@ -197,7 +204,9 @@ def _latest_implementation(
         if comment.author_association not in TRUSTED_ASSOCIATIONS:
             untrusted_candidate = True
             continue
-        valid.append((comment.key, result.artifact))
+        valid.append(
+            (comment.key, _SelectedImplementation(comment, result.artifact))
+        )
     if valid:
         return max(valid, key=lambda item: item[0])[1], None
     if invalid_candidate or untrusted_candidate:
@@ -430,6 +439,8 @@ def _comment_projection(
 
 def _normalize_pull(
     raw: Mapping[str, Any],
+    *,
+    repository_url: str,
 ) -> tuple[dict[str, object] | None, ProjectionError | None, str]:
     try:
         number = _positive_number(raw.get("number"), "a pull request")
@@ -451,10 +462,34 @@ def _normalize_pull(
         return None, ProjectionError(
             "invalid_pull_request", f"linked pull request #{number} has invalid draft metadata"
         ), ""
+    url = raw.get("url")
+    head_branch = raw.get("headRefName")
+    base_branch = raw.get("baseRefName")
+    if not all(
+        isinstance(value, str) and value
+        for value in (url, head_branch, base_branch)
+    ):
+        return None, ProjectionError(
+            "invalid_pull_request",
+            f"linked pull request #{number} has malformed URL or branch metadata",
+        ), ""
+    expected_url = f"{repository_url.rstrip('/')}/pull/{number}"
+    if url.casefold() != expected_url.casefold():
+        return None, ProjectionError(
+            "invalid_pull_request",
+            f"linked pull request #{number} URL does not match its identity",
+        ), ""
     state = state_value.lower()
     timestamp = raw.get("mergedAt") or raw.get("closedAt") or raw.get("createdAt")
     key = timestamp if isinstance(timestamp, str) else ""
-    return {"number": number, "state": state, "draft": draft}, None, key
+    return {
+        "number": number,
+        "url": url,
+        "state": state,
+        "draft": draft,
+        "head_branch": head_branch,
+        "base_branch": base_branch,
+    }, None, key
 
 
 def _linked_pull_request(
@@ -462,7 +497,9 @@ def _linked_pull_request(
 ) -> tuple[dict[str, object] | None, ProjectionError | None]:
     normalized: list[tuple[dict[str, object], str]] = []
     for raw in client.closing_pull_requests(issue_number):
-        pull, error, timestamp = _normalize_pull(raw)
+        pull, error, timestamp = _normalize_pull(
+            raw, repository_url=client.target.web_url
+        )
         if error is not None:
             return None, error
         assert pull is not None
@@ -487,7 +524,9 @@ def _linked_pull_request(
     return selected[0], None
 
 
-def _base_projection(raw: Mapping[str, Any]) -> tuple[dict[str, object], WorkDocument]:
+def _base_projection(
+    raw: Mapping[str, Any], *, detail: ProjectionDetail
+) -> tuple[dict[str, object], WorkDocument]:
     number = _positive_number(raw.get("number"), "an issue")
     title = raw.get("title")
     url = raw.get("html_url")
@@ -519,6 +558,9 @@ def _base_projection(raw: Mapping[str, Any]) -> tuple[dict[str, object], WorkDoc
         "valid": document.valid,
         "errors": [problem.as_dict() for problem in document.errors],
     }
+    if detail == "detailed":
+        projection["body"] = raw.get("body")
+        projection["body_sha256"] = _body_sha256(raw.get("body"))
     return projection, document
 
 
@@ -527,8 +569,9 @@ def project_issue(
     raw: Mapping[str, Any],
     *,
     comments: Sequence[_Comment] | None = None,
+    detail: ProjectionDetail = "compact",
 ) -> dict[str, object]:
-    projection, document = _base_projection(raw)
+    projection, document = _base_projection(raw, detail=detail)
     errors = list(projection["errors"])
     if "pull_request" in raw:
         errors.append(
@@ -554,21 +597,42 @@ def project_issue(
             repository_url=client.target.web_url,
         )
     )
-    artifact, artifact_error = _latest_implementation(
+    selected, artifact_error = _latest_implementation(
         snapshot, issue_number, client.target.web_url
     )
     if artifact_error is not None:
         errors.append(artifact_error.as_dict())
-    if artifact is not None:
+    if selected is not None:
+        artifact = selected.artifact
         state = "stale" if artifact.kind == "stale" else "current"
         if document.status == "in-progress":
             state = "stale"
-        projection["implementation"] = {"state": state, "branch": artifact.branch}
+        implementation: dict[str, object] = {
+            "state": state,
+            "branch": artifact.branch,
+        }
+        if detail == "detailed":
+            implementation.update(
+                {
+                    "commit": artifact.commit,
+                    "verification": artifact.verification,
+                    "comment_id": selected.comment.identifier,
+                    "comment_url": selected.comment.url,
+                }
+            )
+        projection["implementation"] = implementation
 
     pull, pull_error = _linked_pull_request(client, issue_number)
     if pull_error is not None:
         errors.append(pull_error.as_dict())
-    projection["pull_request"] = pull
+    if pull is None or detail == "detailed":
+        projection["pull_request"] = pull
+    else:
+        projection["pull_request"] = {
+            "number": pull["number"],
+            "state": pull["state"],
+            "draft": pull["draft"],
+        }
 
     implementation = projection["implementation"]
     if (
@@ -594,6 +658,7 @@ def inspect_issue(
     client: GitHubClient,
     issue_number: int,
     *,
+    default_branch: str,
     comment_mode: CommentMode | None = None,
 ) -> dict[str, object]:
     raw = client.issue(issue_number)
@@ -608,7 +673,10 @@ def inspect_issue(
         "projection_version": PROJECTION_VERSION,
         "hostname": client.target.hostname,
         "repository": client.target.identity,
-        "issue": project_issue(client, raw, comments=snapshot),
+        "default_branch": default_branch,
+        "issue": project_issue(
+            client, raw, comments=snapshot, detail="detailed"
+        ),
     }
     if comment_mode is not None and snapshot is not None:
         result["comments"] = _comment_projection(

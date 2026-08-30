@@ -8,11 +8,26 @@ import unittest
 from support import FakeClient, copied_fixture
 
 from internal.errors import BreadcrumbOperationalError
-from internal.projection import inspect_issue, list_issues
+from internal.projection import inspect_issue as inspect_issue_projection
+from internal.projection import list_issues
 
 
 COMMENT_PREFIX_DOMAIN = b"Breadcrumb Comment Prefix v1\0"
 EMPTY_COMMENT_PREFIX_SHA256 = hashlib.sha256(COMMENT_PREFIX_DOMAIN).hexdigest()
+
+
+def inspect_issue(
+    client: FakeClient,
+    issue_number: int,
+    *,
+    comment_mode: str | None = None,
+) -> dict[str, object]:
+    return inspect_issue_projection(
+        client,
+        issue_number,
+        default_branch="main",
+        comment_mode=comment_mode,
+    )
 
 
 def ordinary_comment(
@@ -105,10 +120,28 @@ class ProjectionTests(unittest.TestCase):
     def test_absent_artifacts_are_null(self) -> None:
         projection = inspect_issue(FakeClient([self.issues[2]]), 3)
         self.assertNotIn("comments", projection)
+        self.assertEqual(projection["default_branch"], "main")
         issue = projection["issue"]
         self.assertTrue(issue["valid"])
+        self.assertEqual(issue["body"], self.issues[2]["body"])
+        self.assertEqual(
+            issue["body_sha256"],
+            hashlib.sha256(self.issues[2]["body"].encode("utf-8")).hexdigest(),
+        )
         self.assertIsNone(issue["implementation"])
         self.assertIsNone(issue["pull_request"])
+
+    def test_body_sha256_uses_the_exact_utf8_body(self) -> None:
+        raw = copy.deepcopy(self.issues[2])
+        raw["body"] = raw["body"].replace(
+            "Background text.", "한글 배경과 emoji 🥐."
+        )
+        issue = inspect_issue(FakeClient([raw]), 3)["issue"]
+        self.assertEqual(issue["body"], raw["body"])
+        self.assertEqual(
+            issue["body_sha256"],
+            hashlib.sha256(raw["body"].encode("utf-8")).hexdigest(),
+        )
 
     def test_list_and_inspect_expose_todo_items_and_document_warnings(self) -> None:
         canonical = copy.deepcopy(self.issues[1])
@@ -119,6 +152,11 @@ class ProjectionTests(unittest.TestCase):
         )
         listed = list_issues(FakeClient([canonical]))["issues"][0]
         inspected = inspect_issue(FakeClient([canonical]), 2)["issue"]
+
+        self.assertNotIn("body", listed)
+        self.assertNotIn("body_sha256", listed)
+        self.assertIn("body", inspected)
+        self.assertIn("body_sha256", inspected)
 
         for projection in (listed, inspected):
             self.assertEqual(projection["warnings"], [])
@@ -148,10 +186,28 @@ class ProjectionTests(unittest.TestCase):
         current = inspect_issue(
             FakeClient([self.issues[2]], comments={3: self.comments}), 3
         )["issue"]
-        self.assertEqual(stale["implementation"]["state"], "stale")
+        self.assertEqual(
+            stale["implementation"],
+            {
+                "state": "stale",
+                "branch": "breadcrumb/3-implement-retry-policy",
+                "commit": "0123456789abcdef0123456789abcdef01234567",
+                "verification": None,
+                "comment_id": 101,
+                "comment_url": (
+                    "https://ghe.example.test/acme/widgets/issues/3#issuecomment-101"
+                ),
+            },
+        )
         self.assertEqual(current["implementation"], {
             "state": "current",
             "branch": "breadcrumb/3-implement-retry-policy",
+            "commit": "a" * 40,
+            "verification": "pending",
+            "comment_id": 102,
+            "comment_url": (
+                "https://ghe.example.test/acme/widgets/issues/3#issuecomment-102"
+            ),
         })
 
     def test_in_progress_safely_infers_old_implementation_as_stale(self) -> None:
@@ -180,14 +236,61 @@ class ProjectionTests(unittest.TestCase):
         )["issue"]
         self.assertEqual(result["pull_request"], {
             "number": 20,
+            "url": "https://ghe.example.test/acme/widgets/pull/20",
             "state": "open",
             "draft": False,
+            "head_branch": "breadcrumb/3-implement-retry-policy",
+            "base_branch": "main",
         })
+
+    def test_list_keeps_implementation_and_pull_request_compact(self) -> None:
+        projection = list_issues(
+            FakeClient(
+                [self.issues[2]],
+                comments={3: self.comments},
+                pulls={3: self.pulls},
+            )
+        )
+        self.assertNotIn("default_branch", projection)
+        result = projection["issues"][0]
+        self.assertEqual(
+            result["implementation"],
+            {
+                "state": "current",
+                "branch": "breadcrumb/3-implement-retry-policy",
+            },
+        )
+        self.assertEqual(
+            result["pull_request"],
+            {"number": 20, "state": "open", "draft": False},
+        )
+
+    def test_malformed_pull_request_details_are_isolated(self) -> None:
+        variants = (
+            ("url", None),
+            ("url", "https://ghe.example.test/acme/widgets/pull/999"),
+            ("headRefName", ""),
+            ("baseRefName", None),
+        )
+        for field, value in variants:
+            with self.subTest(field=field, value=value):
+                malformed = copy.deepcopy(self.pulls[0])
+                malformed[field] = value
+                result = inspect_issue(
+                    FakeClient([self.issues[2]], pulls={3: [malformed]}), 3
+                )["issue"]
+                self.assertFalse(result["valid"])
+                self.assertIsNone(result["pull_request"])
+                self.assertIn(
+                    "invalid_pull_request",
+                    {item["code"] for item in result["errors"]},
+                )
 
     def test_latest_merged_pull_is_selected_when_none_is_open(self) -> None:
         older = copy.deepcopy(self.pulls[1])
         newer = copy.deepcopy(self.pulls[1])
         newer["number"] = 21
+        newer["url"] = "https://ghe.example.test/acme/widgets/pull/21"
         newer["mergedAt"] = "2026-02-01T00:00:00Z"
         result = inspect_issue(
             FakeClient([self.issues[2]], pulls={3: [older, newer]}), 3
@@ -198,6 +301,7 @@ class ProjectionTests(unittest.TestCase):
     def test_multiple_open_pulls_are_a_conflict(self) -> None:
         second = copy.deepcopy(self.pulls[0])
         second["number"] = 21
+        second["url"] = "https://ghe.example.test/acme/widgets/pull/21"
         result = inspect_issue(
             FakeClient([self.issues[2]], pulls={3: [self.pulls[0], second]}), 3
         )["issue"]
@@ -279,6 +383,7 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(incremental_client.comment_calls, [3])
         self.assertEqual(incremental["comments"]["requested_mode"], "incremental")
         self.assertEqual(incremental["comments"]["effective_mode"], "incremental")
+        self.assertEqual(incremental["issue"]["body_sha256"], body_hash)
         self.assertEqual(incremental["comments"]["body_sha256"], body_hash)
         self.assertEqual(
             [item["id"] for item in incremental["comments"]["items"]], [201]

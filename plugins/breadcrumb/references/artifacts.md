@@ -85,12 +85,20 @@ It returns the validated repository-relative `path` and `body` but never writes 
 ## Projection JSON
 
 `list_work_issues.py` and `inspect_work_issue.py` return projection version `1`, repository identity,
-and issue projections. An issue projection contains number, title, URL, GitHub state, schema version,
-Status, Todo counts and items, document warnings, implementation or `null`, pull request or `null`,
-validity, and structured errors. Each Todo item has `id` (`T<number>` or `null`), `checked`, `text`,
-and a one-based source `line`. A missing ID produces a `missing_todo_id` warning; a duplicate
-non-null ID produces a `duplicate_todo_id` error. Status-filtered lists still surface invalid items.
-Inspect comment mode adds one fully paginated comment snapshot with the raw issue-body SHA-256,
+and issue projections. Their shared compact issue fields are number, title, URL, GitHub state,
+schema version, Status, Todo counts and items, document warnings, implementation or `null`, pull
+request or `null`, validity, and structured errors. Each Todo item has `id` (`T<number>` or `null`),
+`checked`, `text`, and a one-based source `line`. A missing ID produces a `missing_todo_id` warning;
+a duplicate non-null ID produces a `duplicate_todo_id` error. Status-filtered lists still surface
+invalid items.
+
+Inspect additionally returns the current `default_branch`. Its detailed issue projection includes
+the exact fetched `body` and its UTF-8 `body_sha256`. A selected implementation adds `commit`,
+`verification`, `comment_id`, and `comment_url` to the compact `state` and `branch`. A selected pull
+request adds `url`, `head_branch`, and `base_branch` to the compact number, state, and draft fields.
+`verification` is `passed`, `failed`, or `pending` for a current implementation and `null` when the
+selected control comment marks it stale. List output never includes these detailed-only fields.
+Inspect comment mode adds one fully paginated comment snapshot with the same raw issue-body SHA-256,
 empty-prefix SHA-256, selected update checkpoint, ordinary items, valid update artifacts, and
 comment warnings.
 

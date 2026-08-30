@@ -30,10 +30,11 @@ def _parser() -> JsonArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     def action() -> dict[str, object]:
         arguments = _parser().parse_args(argv)
-        _, client = resolve_repository(gh_executable=arguments.gh_executable)
+        context, client = resolve_repository(gh_executable=arguments.gh_executable)
         return inspect_issue(
             client,
             arguments.issue_number,
+            default_branch=context.default_branch,
             comment_mode=arguments.comments,
         )
 
