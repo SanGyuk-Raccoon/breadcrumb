@@ -77,29 +77,43 @@ Treat decomposition as a series of individually verified writes, not a cross-iss
    Decision Brief, add final Decision/rationale, then check it. Give new or rewritten Todo stable
    unused IDs and required Decision Briefs. Append newly discovered work instead of pretending the
    original list was final.
-4. Re-run the shared planning quality gate against the proposed complete body. Every changed
-   requirement or design decision must update affected design, verification, uncertainty, and
-   planning evidence; unresolved findings become new Todo rather than hidden prose.
-5. Reassess one-PR scope. When independent outcomes emerged, produce the complete leaf proposal,
+4. Compare the exact inspected body with the proposed complete body and apply the transitive update
+   change-impact matrix in `planning.md`. Record changed inputs, the primary classification,
+   affected checks and conclusions, related-issue effect, and implementation/pull-request effect.
+   A Background-only edit is non-material only after its scope, acceptance, assumptions, and
+   verification checks remain unchanged. If a current implementation may be invalidated, stop
+   before the ordinary PATCH and prepare the confirmed Coordinated Stale Transition below.
+5. Re-run the shared planning quality gate against the proposed complete body. Every materially
+   affected requirement or design decision must update design, verification, uncertainty, Todo,
+   planning evidence, and ADR input as required by the matrix; unresolved findings become new Todo
+   rather than hidden prose.
+6. Reassess one-PR scope. When independent outcomes emerged, produce the complete leaf proposal,
    validate its dependency waves, and stop before any additional creation or newly-created-leaf
    PATCH unless the user explicitly approves the applicable creation or newly-created-leaf PATCH
    set under Approved Multi-Issue Creation.
-6. Keep Status/Todo consistent. Before transition to `complete`, apply `adr.md` and persist Planning
-   Base, Planned Change Scope, digest-bound complete finder result, final disposition, and complete
-   planned ADR drafts or lifecycle edits. Show and confirm a normalized full-body replacement before
-   repairing malformed schema 1; never overwrite a future schema.
-7. Run the shared gate once more after the ADR result is recorded. Render the full final body with
-   `render_work_issue.py` and PATCH it once after revalidation.
+7. Keep Status/Todo consistent. A material or dependency replan must repeat `adr.md` before retaining
+   or restoring `complete` and persist the current Planning Base, Planned Change Scope, digest-bound
+   complete finder result, final disposition, and complete planned ADR drafts or lifecycle edits.
+   Show and confirm a normalized full-body replacement before repairing malformed schema 1; never
+   overwrite a future schema.
+8. Run the shared gate and impact reassessment once more after the ADR result is recorded. Render the
+   full final body with `render_work_issue.py`. Immediately before PATCH, repeat the direct body
+   SHA-256 and inspected comment-prefix checks against the original snapshot; any body, source
+   comment, timestamp, or rolling-digest mismatch stops before a write. Then PATCH the body once.
 
 ## Coordinated Stale Transition
 
 For `complete -> in-progress` when implementation already exists:
 
 1. Show the exact final body, stale comment, and affected open PR; obtain confirmation.
-2. Convert a linked open non-draft PR to draft first with `gh pr ready <number> --undo`, then verify.
-3. PATCH the body with a concrete unresolved Todo and `in-progress`.
-4. Render and POST one `render_stale_comment.py` result referencing the latest implementation.
-5. Inspect the final projection.
+2. Immediately before the first mutation, repeat the direct body SHA-256 and inspected reviewed
+   comment-prefix checks against the confirmed snapshot. Stop without a write on any mismatch.
+3. Convert a linked open non-draft PR to draft first with `gh pr ready <number> --undo`, then verify.
+4. Immediately before the body PATCH, repeat both snapshot checks. On mismatch, preserve and report
+   the verified draft conversion as a partial result, then stop without changing the issue body.
+5. PATCH the body with a concrete unresolved Todo and `in-progress`.
+6. Render and POST one `render_stale_comment.py` result referencing the latest implementation.
+7. Inspect the final projection.
 
 Stop before body mutation if draft conversion fails. If the body succeeds but stale comment fails,
 preserve the body and report partial completion; the projection still infers stale from

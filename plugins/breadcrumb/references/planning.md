@@ -107,6 +107,54 @@ either one. A structurally valid body is not necessarily implementation-ready.
   After GitHub assigns numbers, show and separately approve the exact dependency-link body patches.
   Neither approval authorizes edits to pre-existing or otherwise related issues.
 
+## Update Change-Impact Reassessment
+
+For every ordinary issue update, compare the exact inspected current body with one proposed final
+body before rendering or writing it. Compare semantic planning content, not only text or checkbox
+differences, and evaluate every changed row below. A mandatory reassessment can conclude that the
+dependent content remains correct; it does not require a cosmetic rewrite.
+
+| Changed planning input | Mandatory downstream reassessment |
+|---|---|
+| Background | Scope, acceptance, design assumptions, and verification. Classify it as non-material only when all four remain unchanged; otherwise continue with every affected row below. |
+| Goal | Included and excluded scope, one-PR cohesion, decomposition, requirements, design, verification, Todo, Planned Change Scope, ADR input/disposition, dependency waves, delivery order, and rollout effect. |
+| Requirements | Design and its normal, failure, compatibility, security, recovery, migration, and rollback behavior; verification coverage; Todo; one-PR scope; Planned Change Scope; and ADR input/disposition. |
+| Design | Requirement consistency, interfaces and state transitions, failure/recovery and migration/rollback behavior, verification coverage, Todo, Planned Change Scope, and ADR input/disposition. |
+| Verification | Coverage of every observable requirement and design boundary, applicable negative/failure/compatibility evidence, unresolved Todo, and readiness. |
+| Todo or a recorded decision | The narrative section that owns the conclusion, rationale and provenance, plus every downstream row affected by the decision's meaning, ADR disposition, and readiness. |
+| Planned Change Scope, ADR input, disposition, or draft | Actual components, paths, resources, behaviors and long-lived decisions; one-PR cohesion; verification; and the complete ADR planning gate. |
+| Dependencies, waves, or Delivery Order | Every leaf boundary, predecessor, blocker, parallel claim, delivery constraint, and rollout effect; recompute the complete acyclic wave sequence and identify affected related issues. |
+
+Follow reassessment transitively: when a mandatory check changes another planning input, evaluate
+that row too, repeating until no newly affected input remains. Then choose one primary classification
+using this precedence while still recording all affected rows:
+
+1. `implementation-stale change`: a current implementation exists and may no longer satisfy the
+   materially changed plan. Treat every material post-implementation change as a stale candidate;
+   classify it lower only when current implementation evidence proves it remains unaffected and the
+   conclusion records why.
+2. `dependency replan`: dependency edges, waves, Delivery Order, or rollout sequencing changed and
+   the implementation is not stale.
+3. `material replan`: another semantic Goal, Requirements, Design, Verification, Todo, Planned
+   Change Scope, ADR input, disposition, or draft changed.
+4. `non-material clarification`: wording or Background context changed without changing scope,
+   acceptance, assumptions, downstream planning, or implementation validity.
+
+For a material or dependency replan, rerun the applicable quality, one-PR/decomposition, and
+complete ADR planning gates before retaining or restoring `complete`. For an implementation-stale
+change, stop the ordinary update before mutation and use the confirmed coordinated stale transition;
+classification alone never changes implementation or pull-request state. Record ADR impact and an
+unresolved Todo in the stale `in-progress` plan, then repeat the complete ADR gate before a later
+return to `complete`. A dependency replan recomputes the whole graph but never silently patches
+related issues: show each exact proposed follow-up and require its own authorized selected-issue
+update.
+
+Record the comparison body SHA-256, changed inputs, primary classification, affected checks and
+their conclusions, related-issue effect, implementation/pull-request effect, and repeated ADR result
+when applicable. Put the concise record in the issue narrative or update checkpoint without adding
+control metadata or copying raw comments. Preserve the existing contiguous comment prefix, single
+body PATCH, concurrency revalidation, and partial-result boundaries.
+
 ## Readiness Conclusion
 
 - `backlog`: durable capture only; planning has not started.
