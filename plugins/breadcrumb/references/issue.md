@@ -9,7 +9,10 @@ material requirements, decisions, progress, and planning state belong in the iss
    Verification, and Todo. Distinguish fact, inference, user requirement, and uncertainty.
 2. Apply the shared planning quality gate before detailed refinement. Ask one focused highest-impact
    question only when its answer materially changes scope or acceptance. Otherwise record the
-   uncertainty as a concrete unchecked Todo with an increasing stable `T<number>` identifier.
+   uncertainty as a concrete unchecked Todo with an increasing stable `T<number>` identifier. An
+   investigation that only gathers evidence is an `Action`, but when its result will select among
+   materially different remedies, also record that downstream choice now as a separate `Decision`
+   Todo with its Decision Brief; do not hide the unresolved choice behind the investigation.
 3. Add a same-ID Decision Brief for every decision-bearing unresolved Todo using the contract in
    `artifacts.md`. Do not invent alternatives; state when only one option is viable or evidence does
    not support a recommendation.
@@ -72,7 +75,10 @@ Treat decomposition as a series of individually verified writes, not a cross-iss
    contiguous prefix whose items are reflected, explicitly rejected, or recorded irrelevant. Stop
    before the first unresolved/unreviewed item even when a later comment is actionable. Preserve
    each prefix item's ID, URL, timestamps, exact body, and parser-provided `prefix_sha256` for final
-   revalidation.
+   revalidation. Mutually exclusive requests remain unresolved unless public evidence explicitly
+   accepts or rejects one. Merely listing both as open Decision options does not reflect either
+   request: stop before the earliest item in that conflict, do not patch the body to record it, and
+   do not advance a checkpoint across it.
 3. Reflect a completed Todo conclusion and source URL in the relevant narrative, preserve its
    Decision Brief, add final Decision/rationale, then check it. Give new or rewritten Todo stable
    unused IDs and required Decision Briefs. Append newly discovered work instead of pretending the
@@ -80,6 +86,9 @@ Treat decomposition as a series of individually verified writes, not a cross-iss
 4. Compare the exact inspected body with the proposed complete body and apply the transitive update
    change-impact matrix in `planning.md`. Record changed inputs, the primary classification,
    affected checks and conclusions, related-issue effect, and implementation/pull-request effect.
+   Any predecessor, blocker, parallelization, delivery-order, or rollout input change is a
+   `dependency replan` even when product requirements otherwise stay unchanged: recompute the whole
+   dependency graph, acyclic waves, distinct delivery order, and rollout claims before any write.
    A Background-only edit is non-material only after its scope, acceptance, assumptions, and
    verification checks remain unchanged. If a current implementation may be invalidated, stop
    before the ordinary PATCH and prepare the confirmed Coordinated Stale Transition below.
@@ -104,6 +113,11 @@ Treat decomposition as a series of individually verified writes, not a cross-iss
 ## Coordinated Stale Transition
 
 For `complete -> in-progress` when implementation already exists:
+
+The public preview and action summary must expose the two body/comment-prefix checks below as
+separate mutation boundaries. Do not collapse the pre-first-mutation check and the post-draft,
+pre-body-PATCH check into generic revalidation, and state that a verified draft conversion survives
+a failure at the second boundary.
 
 1. Show the exact final body, stale comment, and affected open PR; obtain confirmation.
 2. Immediately before the first mutation, repeat the direct body SHA-256 and inspected reviewed

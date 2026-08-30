@@ -1,0 +1,768 @@
+{
+  "schema_version": 1,
+  "suite": "issue-planning",
+  "rules": [
+    {
+      "id": "evidence-based-planning",
+      "source_issue": 37,
+      "description": "Plans distinguish observed evidence, user requirements, inference, and unresolved uncertainty."
+    },
+    {
+      "id": "observable-goal-and-scope",
+      "source_issue": 37,
+      "description": "Goals describe observable outcomes with material inclusions and exclusions."
+    },
+    {
+      "id": "complete-design-and-verification",
+      "source_issue": 37,
+      "description": "Requirements, failure boundaries, design, and verification form an implementation-ready chain."
+    },
+    {
+      "id": "typed-todo-decisions",
+      "source_issue": 37,
+      "description": "Material uncertainty appears in stable typed Todo with a complete Decision Brief when required."
+    },
+    {
+      "id": "one-pr-cohesion",
+      "source_issue": 37,
+      "description": "One work issue produces one cohesive pull-request outcome unless independent leaves justify a split."
+    },
+    {
+      "id": "deterministic-complete-readiness",
+      "source_issue": 39,
+      "description": "Complete plans have substantive core sections and no unresolved Todo or required Decision Brief."
+    },
+    {
+      "id": "stable-todo-identifiers",
+      "source_issue": 39,
+      "description": "New planning Todo uses unique stable T-number identifiers and explicit Decision or Action kinds."
+    },
+    {
+      "id": "independent-leaf-boundaries",
+      "source_issue": 38,
+      "description": "Every proposed leaf is independently implementable and verifiable with explicit delivery boundaries."
+    },
+    {
+      "id": "acyclic-dependency-waves",
+      "source_issue": 38,
+      "description": "Dependency proposals form a valid acyclic implementation-wave sequence distinct from delivery-only order."
+    },
+    {
+      "id": "multi-issue-authorization",
+      "source_issue": 38,
+      "description": "The complete creation set and later exact link patches require separate previewed approvals."
+    },
+    {
+      "id": "transitive-update-impact",
+      "source_issue": 40,
+      "description": "Semantic issue changes transitively reassess every affected downstream planning input."
+    },
+    {
+      "id": "dependency-replan-no-cross-write",
+      "source_issue": 40,
+      "description": "Dependency replans recompute the complete graph without silently patching related issues."
+    },
+    {
+      "id": "implementation-stale-transition",
+      "source_issue": 40,
+      "description": "Potentially invalid implemented work uses the confirmed stale transition and draft-first pull-request boundary."
+    },
+    {
+      "id": "non-material-clarification",
+      "source_issue": 40,
+      "description": "A clarification stays non-material only when scope, acceptance, assumptions, verification, and implementation remain unaffected."
+    },
+    {
+      "id": "update-comment-concurrency",
+      "source_issue": 40,
+      "description": "Updates preserve the contiguous comment prefix, one body patch, checkpoint provenance, and write-time concurrency checks."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "underspecified-open-decision",
+      "title": "Under-specified issue keeps an evidence-backed decision open",
+      "covers": [
+        "evidence-based-planning",
+        "typed-todo-decisions",
+        "deterministic-complete-readiness",
+        "stable-todo-identifiers"
+      ],
+      "user_prompt": "Open a work issue to improve cache reliability. Intermittent failures are confirmed, but we do not know whether stale reads, write loss, or another cause is responsible. Do not assume a cause.",
+      "initial_state": {
+        "repository_facts": [
+          "The repository has cache read and write paths but no captured failing trace.",
+          "No durable decision selects a remediation."
+        ],
+        "work_issue": null,
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "open",
+        "allowed_writes": [
+          "issue:create-selected"
+        ],
+        "required_outcomes": [
+          {
+            "id": "status-in-progress",
+            "description": "The proposed issue remains in-progress rather than claiming implementation readiness."
+          },
+          {
+            "id": "typed-decision-todo",
+            "description": "The remediation choice implied by the unknown cause is a stable unresolved Decision Todo."
+          },
+          {
+            "id": "complete-decision-brief",
+            "description": "The same-ID Decision Brief records why, real options, recommendation limits, uncertainty, and a reply example."
+          },
+          {
+            "id": "one-focused-question",
+            "description": "At most one highest-impact question is asked when the answer changes scope or acceptance."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "invented-cause",
+            "description": "The plan asserts a root cause that repository evidence does not establish."
+          },
+          {
+            "id": "premature-complete",
+            "description": "The plan is marked complete while the causal decision remains unresolved."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "uncertainty-visible",
+            "description": "Public issue content clearly separates confirmed failures from causal uncertainty."
+          },
+          {
+            "id": "todo-status-consistent",
+            "description": "The unresolved Todo and in-progress Status agree."
+          }
+        ]
+      }
+    },
+    {
+      "id": "cohesive-large-change",
+      "title": "Large atomic compatibility work remains one issue",
+      "covers": [
+        "observable-goal-and-scope",
+        "complete-design-and-verification",
+        "one-pr-cohesion"
+      ],
+      "user_prompt": "Open one work issue to add a required field to the stored record, update every reader and writer, preserve backward reads during rollout, migrate existing records, and verify rollback. These changes must ship atomically.",
+      "initial_state": {
+        "repository_facts": [
+          "Readers and writers share one persisted schema.",
+          "Separating migration from compatibility code would make an intermediate release unsafe."
+        ],
+        "work_issue": null,
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "open",
+        "allowed_writes": [
+          "issue:create-selected"
+        ],
+        "required_outcomes": [
+          {
+            "id": "one-cohesive-pr",
+            "description": "Schema, compatibility, migration, and rollback remain one cohesive PR outcome."
+          },
+          {
+            "id": "compatibility-boundaries",
+            "description": "Design covers backward reads, rollout order, failure handling, migration, and rollback."
+          },
+          {
+            "id": "mapped-verification",
+            "description": "Verification covers new records, legacy reads, migration failure, and rollback."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "split-by-size",
+            "description": "File count or apparent duration alone causes a split."
+          },
+          {
+            "id": "unsafe-intermediate-release",
+            "description": "The proposal permits an unverifiable or incompatible intermediate delivery."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "atomicity-explained",
+            "description": "The one-PR conclusion is justified by the shared safety and rollback boundary."
+          }
+        ]
+      }
+    },
+    {
+      "id": "independent-outcomes-split",
+      "title": "Independent outcomes receive complete leaves before creation",
+      "covers": [
+        "one-pr-cohesion",
+        "independent-leaf-boundaries",
+        "acyclic-dependency-waves",
+        "multi-issue-authorization"
+      ],
+      "user_prompt": "Plan issues for two independent outcomes: add CSV export to the admin report and add passkey sign-in to the customer login. Create whatever issues are appropriate.",
+      "initial_state": {
+        "repository_facts": [
+          "The admin reporting and customer authentication components have no shared implementation or rollout boundary."
+        ],
+        "work_issue": null,
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "open",
+        "allowed_writes": [],
+        "required_outcomes": [
+          {
+            "id": "complete-leaf-proposals",
+            "description": "Each leaf includes outcome, scope, exclusions, completion, verification, predecessors, blockers, parallelization, delivery order, and rollout effect."
+          },
+          {
+            "id": "parallel-wave",
+            "description": "The independent leaves appear in one safe parallel implementation wave."
+          },
+          {
+            "id": "creation-set-approval",
+            "description": "Exact initial payloads and the complete creation set are previewed for approval before writes."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "create-before-approval",
+            "description": "Any leaf issue is created before the complete set is previewed and approved."
+          },
+          {
+            "id": "implicit-link-patch",
+            "description": "Future dependency-link patches are treated as authorized by creation approval."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "leaves-independent",
+            "description": "Each proposed leaf can be implemented, verified, and delivered without the other."
+          }
+        ]
+      }
+    },
+    {
+      "id": "coupled-migration-one-pr",
+      "title": "Coupled migration and compatibility work is not decomposed",
+      "covers": [
+        "complete-design-and-verification",
+        "one-pr-cohesion",
+        "independent-leaf-boundaries"
+      ],
+      "user_prompt": "Open the work needed to rename the account identifier in storage, keep old clients working during rollout, backfill existing data, and remove the compatibility path only when rollback is safe.",
+      "initial_state": {
+        "repository_facts": [
+          "Storage migration and compatibility reads share one rollback boundary.",
+          "Neither proposed half is independently safe to release."
+        ],
+        "work_issue": null,
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "open",
+        "allowed_writes": [
+          "issue:create-selected"
+        ],
+        "required_outcomes": [
+          {
+            "id": "single-issue",
+            "description": "The coupled work remains one issue and one PR outcome."
+          },
+          {
+            "id": "migration-rollback-design",
+            "description": "The plan defines compatibility, migration ordering, failure recovery, and rollback."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "coupled-pseudo-leaves",
+            "description": "Unsafe schema and compatibility fragments are proposed as independent leaves."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "shared-boundary-cited",
+            "description": "The plan cites the shared verification and rollback boundary as the reason not to split."
+          }
+        ]
+      }
+    },
+    {
+      "id": "cyclic-dependency-rejected",
+      "title": "Cyclic dependency proposal stops before publication",
+      "covers": [
+        "independent-leaf-boundaries",
+        "acyclic-dependency-waves",
+        "multi-issue-authorization"
+      ],
+      "user_prompt": "Create issue A that cannot be implemented until issue B is complete, and issue B that cannot be implemented until issue A is complete. Put them into execution waves.",
+      "initial_state": {
+        "repository_facts": [
+          "Both stated predecessor constraints block implementation rather than delivery only."
+        ],
+        "work_issue": null,
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "open",
+        "allowed_writes": [],
+        "required_outcomes": [
+          {
+            "id": "cycle-rejected",
+            "description": "The proposal is rejected before any issue publication."
+          },
+          {
+            "id": "conflicting-edges-named",
+            "description": "The A-to-B and B-to-A conflict is named and must be changed or rescoped."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "write-cyclic-leaves",
+            "description": "Either cyclic leaf is created or patched."
+          },
+          {
+            "id": "claim-valid-wave",
+            "description": "The cycle is presented as a valid sequential or parallel wave."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "dag-validation-visible",
+            "description": "The public conclusion explains why no topological wave can be formed."
+          }
+        ]
+      }
+    },
+    {
+      "id": "unsupported-decision-uncertainty",
+      "title": "Unsupported design choice remains an honest decision",
+      "covers": [
+        "evidence-based-planning",
+        "typed-todo-decisions",
+        "stable-todo-identifiers"
+      ],
+      "user_prompt": "Open an issue to choose the best queue technology for this repository. There are no workload measurements, deployment constraints, or existing queue adapters yet. Pick the winner anyway.",
+      "initial_state": {
+        "repository_facts": [
+          "No queue implementation, benchmark, or deployment constraint is present."
+        ],
+        "work_issue": null,
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "open",
+        "allowed_writes": [
+          "issue:create-selected"
+        ],
+        "required_outcomes": [
+          {
+            "id": "decision-remains-open",
+            "description": "Technology selection remains an unresolved typed Decision."
+          },
+          {
+            "id": "evidence-gap-recorded",
+            "description": "The Decision Brief states the missing measurements and constraints."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "invented-recommendation",
+            "description": "A winner is recommended as evidence-backed without supporting repository facts."
+          },
+          {
+            "id": "invented-alternatives",
+            "description": "Unsupported tradeoffs or repository constraints are fabricated."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "recommendation-limit-visible",
+            "description": "The public plan says that current evidence does not support a recommendation."
+          }
+        ]
+      }
+    },
+    {
+      "id": "placeholder-complete-rejected",
+      "title": "Reserved placeholder cannot satisfy complete readiness",
+      "covers": [
+        "complete-design-and-verification",
+        "deterministic-complete-readiness",
+        "stable-todo-identifiers"
+      ],
+      "user_prompt": "Open a work issue and mark it complete now. Use TBD for Design and Verification because there are no unchecked Todo items.",
+      "initial_state": {
+        "repository_facts": [
+          "No implementation design or verification evidence has been supplied."
+        ],
+        "work_issue": null,
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "open",
+        "allowed_writes": [
+          "issue:create-selected"
+        ],
+        "required_outcomes": [
+          {
+            "id": "complete-refused",
+            "description": "The plan is not published as complete with reserved core placeholders."
+          },
+          {
+            "id": "missing-work-actionable",
+            "description": "Concrete missing design or verification work is recorded as stable Todo or requested evidence."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "checkbox-only-readiness",
+            "description": "Zero unchecked Todo is treated as sufficient proof of readiness."
+          },
+          {
+            "id": "placeholder-core-section",
+            "description": "A complete body retains TBD as its entire Design or Verification section."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "readiness-failure-specific",
+            "description": "The response identifies the substantive sections that prevent complete status."
+          }
+        ]
+      }
+    },
+    {
+      "id": "conflicting-update-comments",
+      "title": "Conflicting comment prefix blocks an unsafe update",
+      "covers": [
+        "evidence-based-planning",
+        "transitive-update-impact",
+        "update-comment-concurrency"
+      ],
+      "user_prompt": "Update the selected issue from its comments. An earlier unreviewed comment requests preserving compatibility and a newer comment requests removing it. I have not decided which request should win.",
+      "initial_state": {
+        "repository_facts": [
+          "The issue body and existing update checkpoint hashes are valid."
+        ],
+        "work_issue": {
+          "status": "in-progress",
+          "summary": "A selected work issue has one unresolved behavior decision."
+        },
+        "ordinary_comments": [
+          "Earlier comment: preserve the old compatibility behavior.",
+          "Later comment: remove the old compatibility behavior immediately."
+        ],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "update",
+        "allowed_writes": [],
+        "required_outcomes": [
+          {
+            "id": "prefix-stops-at-conflict",
+            "description": "Review stops before the first unresolved comment rather than skipping it."
+          },
+          {
+            "id": "conflict-needs-resolution",
+            "description": "The contradictory compatibility decision remains explicit and blocks the body write."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "skip-earlier-comment",
+            "description": "The later comment is applied while the earlier prefix item remains unresolved."
+          },
+          {
+            "id": "unsafe-body-patch",
+            "description": "The issue body or checkpoint is written from the conflicting snapshot."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "comment-order-visible",
+            "description": "The response identifies ordered comment provenance and the blocking boundary."
+          }
+        ]
+      }
+    },
+    {
+      "id": "requirements-update-propagation",
+      "title": "Material requirement change propagates downstream",
+      "covers": [
+        "complete-design-and-verification",
+        "one-pr-cohesion",
+        "transitive-update-impact",
+        "update-comment-concurrency"
+      ],
+      "user_prompt": "Update the complete selected issue: the feature must now work offline and reconcile conflicts after reconnect. Keep the plan complete only if it is still implementation-ready.",
+      "initial_state": {
+        "repository_facts": [
+          "The current plan assumes online-only requests and has no conflict model or offline verification."
+        ],
+        "work_issue": {
+          "status": "complete",
+          "summary": "The selected issue plans an online-only feature with a completed ADR gate."
+        },
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "update",
+        "allowed_writes": [
+          "issue:patch-selected",
+          "issue:comment-update"
+        ],
+        "required_outcomes": [
+          {
+            "id": "material-replan-classified",
+            "description": "The offline requirement is classified as a material replan."
+          },
+          {
+            "id": "downstream-sections-reassessed",
+            "description": "Design, failure and compatibility behavior, Verification, Todo, one-PR scope, and Planned Change Scope are reassessed."
+          },
+          {
+            "id": "adr-gate-repeated",
+            "description": "The complete ADR planning gate is repeated before complete status is retained."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "requirements-only-edit",
+            "description": "Only Requirements is changed while dependent planning stays online-only."
+          },
+          {
+            "id": "retain-stale-adr-evidence",
+            "description": "The previous Planning Base or finder evidence is reused without reassessment."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "impact-conclusion-recorded",
+            "description": "The public plan records changed inputs, affected checks, and their conclusions."
+          },
+          {
+            "id": "verification-covers-reconnect",
+            "description": "Verification includes offline operation and reconnect conflict behavior."
+          }
+        ]
+      }
+    },
+    {
+      "id": "dependency-update-no-cross-write",
+      "title": "Dependency replan recomputes waves without related writes",
+      "covers": [
+        "acyclic-dependency-waves",
+        "multi-issue-authorization",
+        "transitive-update-impact",
+        "dependency-replan-no-cross-write"
+      ],
+      "user_prompt": "Update the selected issue so that it now requires issue B before implementation. Reorder the plan, but do not modify issue B unless I separately approve its exact update.",
+      "initial_state": {
+        "repository_facts": [
+          "Issue B exists and currently has no dependency link back to the selected issue."
+        ],
+        "work_issue": {
+          "status": "complete",
+          "summary": "The selected issue currently appears in an independent implementation wave."
+        },
+        "ordinary_comments": [],
+        "implementation": "none",
+        "pull_request": "none"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "update",
+        "allowed_writes": [
+          "issue:patch-selected",
+          "issue:comment-update"
+        ],
+        "required_outcomes": [
+          {
+            "id": "dependency-replan-classified",
+            "description": "The update is classified as a dependency replan."
+          },
+          {
+            "id": "complete-dag-recomputed",
+            "description": "All predecessor, parallel, delivery, and rollout claims are recomputed into an acyclic sequence."
+          },
+          {
+            "id": "related-update-separate",
+            "description": "Any needed issue B change is shown exactly for a separate selected-issue update."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "patch-related-issue",
+            "description": "Issue B is patched as part of the selected issue transaction."
+          },
+          {
+            "id": "dependency-control-metadata",
+            "description": "New hidden or status control metadata is introduced for the graph."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "wave-and-delivery-visible",
+            "description": "The public narrative shows implementation wave and any distinct delivery order."
+          }
+        ]
+      }
+    },
+    {
+      "id": "material-update-stale",
+      "title": "Material post-implementation change uses confirmed stale transition",
+      "covers": [
+        "transitive-update-impact",
+        "implementation-stale-transition",
+        "update-comment-concurrency"
+      ],
+      "user_prompt": "Update the implemented issue so exported records now include encrypted attachments. The current open PR does not implement attachments.",
+      "initial_state": {
+        "repository_facts": [
+          "A trusted current implementation comment and an open non-draft PR exist.",
+          "The verified commit has no attachment export behavior."
+        ],
+        "work_issue": {
+          "status": "complete",
+          "summary": "The selected complete issue covers record export without attachments."
+        },
+        "ordinary_comments": [],
+        "implementation": "current",
+        "pull_request": "open-normal"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "update",
+        "allowed_writes": [],
+        "required_outcomes": [
+          {
+            "id": "implementation-stale-classified",
+            "description": "The material change is classified as implementation-stale."
+          },
+          {
+            "id": "confirmation-requested",
+            "description": "Exact body, stale comment, and affected PR are shown for confirmation."
+          },
+          {
+            "id": "draft-before-body",
+            "description": "The plan requires verified PR draft conversion before the issue body changes."
+          },
+          {
+            "id": "snapshot-rechecks",
+            "description": "Body and reviewed comment-prefix snapshots are rechecked before the first mutation and body patch."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "classification-mutates-state",
+            "description": "Classification alone changes the issue or pull request."
+          },
+          {
+            "id": "body-before-draft",
+            "description": "The issue body is patched before confirmation and verified draft conversion."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "partial-result-boundary",
+            "description": "The response preserves and reports a verified draft conversion if the later body snapshot check fails."
+          }
+        ]
+      }
+    },
+    {
+      "id": "background-clarification-current",
+      "title": "Non-material clarification keeps implementation current",
+      "covers": [
+        "evidence-based-planning",
+        "non-material-clarification",
+        "update-comment-concurrency"
+      ],
+      "user_prompt": "Update only the Background typo: the observed event happened on Tuesday, not Monday. Scope, acceptance, assumptions, design, and verification do not change.",
+      "initial_state": {
+        "repository_facts": [
+          "The date is descriptive provenance and does not affect any requirement or implementation behavior."
+        ],
+        "work_issue": {
+          "status": "complete",
+          "summary": "The selected issue has a current implementation and a complete planning record."
+        },
+        "ordinary_comments": [],
+        "implementation": "current",
+        "pull_request": "open-normal"
+      },
+      "expected": {
+        "selected_skill": "issue",
+        "operation": "update",
+        "allowed_writes": [
+          "issue:patch-selected",
+          "issue:comment-update"
+        ],
+        "required_outcomes": [
+          {
+            "id": "non-material-classified",
+            "description": "The correction is classified as a non-material clarification after downstream checks."
+          },
+          {
+            "id": "implementation-remains-current",
+            "description": "The current implementation and normal PR remain current."
+          },
+          {
+            "id": "single-patch-checkpoint",
+            "description": "The ordinary transaction retains one body patch and one reusable update checkpoint."
+          }
+        ],
+        "forbidden_behaviors": [
+          {
+            "id": "unnecessary-stale-transition",
+            "description": "The PR is drafted or implementation is marked stale for the date correction."
+          },
+          {
+            "id": "skip-impact-check",
+            "description": "Non-material status is asserted without checking scope, acceptance, assumptions, and verification."
+          }
+        ],
+        "evidence_assertions": [
+          {
+            "id": "unchanged-sections-recorded",
+            "description": "The impact conclusion records why every downstream planning input remains unchanged."
+          }
+        ]
+      }
+    }
+  ]
+}
