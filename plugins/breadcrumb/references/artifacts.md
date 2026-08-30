@@ -20,8 +20,10 @@ Use `scripts/render_work_issue.py`. The body has exactly these visible level-two
 
 The first five sections may contain human-readable Markdown with level-three or deeper subsections.
 `Todo` contains only Markdown task-list items and blank lines. New or rewritten items use durable
-`T<number>` identifiers; never reuse an identifier or change a completed item's meaning. Preserve
-meaningful completed work and mark cancellation as a checked item with a concise reason.
+`T<number>:` identifiers with a positive integer and no leading zero; never reuse an identifier or
+change a completed item's meaning. Preserve meaningful completed work and mark cancellation as a
+checked item with a concise reason. Existing items without a canonical ID remain valid and surface
+a non-blocking warning instead of requiring bulk migration.
 
 A decision-bearing unresolved Todo has a same-ID Decision Brief under the relevant narrative
 section. Include Why, real Options with benefits/costs/risks/prerequisites, an evidence-based
@@ -82,10 +84,13 @@ behaviors. It returns the validated repository-relative `path` and `body` but ne
 
 `list_work_issues.py` and `inspect_work_issue.py` return projection version `1`, repository identity,
 and issue projections. An issue projection contains number, title, URL, GitHub state, schema version,
-Status, Todo counts, implementation or `null`, pull request or `null`, validity, and structured
-errors. Status-filtered lists still surface invalid items. Inspect comment mode adds one fully
-paginated comment snapshot with the raw issue-body SHA-256, empty-prefix SHA-256, selected update
-checkpoint, ordinary items, valid update artifacts, and warnings.
+Status, Todo counts and items, document warnings, implementation or `null`, pull request or `null`,
+validity, and structured errors. Each Todo item has `id` (`T<number>` or `null`), `checked`, `text`,
+and a one-based source `line`. A missing ID produces a `missing_todo_id` warning; a duplicate
+non-null ID produces a `duplicate_todo_id` error. Status-filtered lists still surface invalid items.
+Inspect comment mode adds one fully paginated comment snapshot with the raw issue-body SHA-256,
+empty-prefix SHA-256, selected update checkpoint, ordinary items, valid update artifacts, and
+comment warnings.
 
 `project_adrs.py` returns projection version `1`, repository identity, top-level validity, current
 corpus metadata and digest, an all-document index, optional base snapshot and lifecycle diff, and an

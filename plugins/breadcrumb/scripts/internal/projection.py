@@ -511,7 +511,9 @@ def _base_projection(raw: Mapping[str, Any]) -> tuple[dict[str, object], WorkDoc
         "todo": {
             "resolved": document.resolved,
             "unresolved": document.unresolved,
+            "items": [item.as_dict() for item in document.items],
         },
+        "warnings": [warning.as_dict() for warning in document.warnings],
         "implementation": None,
         "pull_request": None,
         "valid": document.valid,

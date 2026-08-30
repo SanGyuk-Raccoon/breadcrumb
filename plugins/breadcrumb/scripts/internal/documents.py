@@ -23,6 +23,7 @@ STATUS_HEADING = "## Breadcrumb Status"
 _LEVEL_TWO_HEADING_RE = re.compile(r"^##(?:\s|$).*$")
 _FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(?:.*)$")
 _TASK_RE = re.compile(r"^- \[([ xX])\] (\S(?:.*\S)?)$")
+_TODO_ID_RE = re.compile(r"^(T[1-9][0-9]*): +(\S(?:.*\S)?)$")
 _FIELD_RE = re.compile(r"^- ([A-Za-z][A-Za-z ]*): (\S(?:.*\S)?)$")
 
 
@@ -44,11 +45,39 @@ class DocumentError:
 
 
 @dataclass(frozen=True)
+class DocumentWarning:
+    code: str
+    message: str
+    line: int
+
+    def as_dict(self) -> dict[str, object]:
+        return {"code": self.code, "message": self.message, "line": self.line}
+
+
+@dataclass(frozen=True)
+class TodoItem:
+    id: str | None
+    checked: bool
+    text: str
+    line: int
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "id": self.id,
+            "checked": self.checked,
+            "text": self.text,
+            "line": self.line,
+        }
+
+
+@dataclass(frozen=True)
 class WorkDocument:
     schema_version: int | None
     status: str | None
     resolved: int
     unresolved: int
+    items: tuple[TodoItem, ...]
+    warnings: tuple[DocumentWarning, ...]
     errors: tuple[DocumentError, ...]
 
     @property
@@ -62,7 +91,9 @@ class WorkDocument:
             "todo": {
                 "resolved": self.resolved,
                 "unresolved": self.unresolved,
+                "items": [item.as_dict() for item in self.items],
             },
+            "warnings": [warning.as_dict() for warning in self.warnings],
             "valid": self.valid,
             "errors": [problem.as_dict() for problem in self.errors],
         }
@@ -160,16 +191,19 @@ def _heading_positions(
 
 def _parse_todo(
     lines: list[str], positions: dict[str, int], problems: list[DocumentError]
-) -> tuple[int, int]:
+) -> tuple[int, int, tuple[TodoItem, ...], tuple[DocumentWarning, ...]]:
     if TODO_HEADING not in positions or STATUS_HEADING not in positions:
-        return 0, 0
+        return 0, 0, (), ()
     start = positions[TODO_HEADING]
     end = positions[STATUS_HEADING]
     if start >= end:
-        return 0, 0
+        return 0, 0, (), ()
 
     resolved = 0
     unresolved = 0
+    items: list[TodoItem] = []
+    warnings: list[DocumentWarning] = []
+    seen_ids: set[str] = set()
     for index in range(start + 1, end):
         line = lines[index]
         if not line.strip():
@@ -183,11 +217,36 @@ def _parse_todo(
                 index + 1,
             )
             continue
-        if match.group(1) == " ":
+        checked = match.group(1) != " "
+        if not checked:
             unresolved += 1
         else:
             resolved += 1
-    return resolved, unresolved
+
+        text = match.group(2)
+        identifier: str | None = None
+        identifier_match = _TODO_ID_RE.fullmatch(text)
+        if identifier_match is None:
+            warnings.append(
+                DocumentWarning(
+                    "missing_todo_id",
+                    "Todo item does not start with a canonical T<number>: identifier",
+                    index + 1,
+                )
+            )
+        else:
+            identifier, text = identifier_match.groups()
+            if identifier in seen_ids:
+                _problem(
+                    problems,
+                    "duplicate_todo_id",
+                    f"Todo ID {identifier} appears more than once",
+                    index + 1,
+                )
+            else:
+                seen_ids.add(identifier)
+        items.append(TodoItem(identifier, checked, text, index + 1))
+    return resolved, unresolved, tuple(items), tuple(warnings)
 
 
 def _parse_status(
@@ -287,11 +346,11 @@ def parse_work_body(body: object) -> WorkDocument:
     problems: list[DocumentError] = []
     if not isinstance(body, str) or not body.strip():
         _problem(problems, "missing_body", "issue body is missing")
-        return WorkDocument(None, None, 0, 0, tuple(problems))
+        return WorkDocument(None, None, 0, 0, (), (), tuple(problems))
 
     lines = normalize_markdown(body).split("\n")
     positions = _heading_positions(lines, problems)
-    resolved, unresolved = _parse_todo(lines, positions, problems)
+    resolved, unresolved, items, warnings = _parse_todo(lines, positions, problems)
     schema_version, status = _parse_status(lines, positions, problems)
 
     if status == "in-progress" and unresolved == 0:
@@ -312,5 +371,7 @@ def parse_work_body(body: object) -> WorkDocument:
         status,
         resolved,
         unresolved,
+        items,
+        warnings,
         tuple(problems),
     )

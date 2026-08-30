@@ -110,6 +110,37 @@ class ProjectionTests(unittest.TestCase):
         self.assertIsNone(issue["implementation"])
         self.assertIsNone(issue["pull_request"])
 
+    def test_list_and_inspect_expose_todo_items_and_document_warnings(self) -> None:
+        canonical = copy.deepcopy(self.issues[1])
+        canonical["body"] = canonical["body"].replace(
+            "- [x] Select bounded backoff.", "- [x] T1: Select bounded backoff."
+        ).replace(
+            "- [ ] Decide the retry limit.", "- [ ] T2: Decide the retry limit."
+        )
+        listed = list_issues(FakeClient([canonical]))["issues"][0]
+        inspected = inspect_issue(FakeClient([canonical]), 2)["issue"]
+
+        for projection in (listed, inspected):
+            self.assertEqual(projection["warnings"], [])
+            self.assertEqual(
+                [
+                    (item["id"], item["checked"], item["text"])
+                    for item in projection["todo"]["items"]
+                ],
+                [
+                    ("T1", True, "Select bounded backoff."),
+                    ("T2", False, "Decide the retry limit."),
+                ],
+            )
+
+        legacy = inspect_issue(FakeClient([self.issues[0]]), 1)["issue"]
+        self.assertTrue(legacy["valid"])
+        self.assertIsNone(legacy["todo"]["items"][0]["id"])
+        self.assertEqual(
+            {warning["code"] for warning in legacy["warnings"]},
+            {"missing_todo_id"},
+        )
+
     def test_latest_valid_comment_controls_current_or_stale(self) -> None:
         stale = inspect_issue(
             FakeClient([self.issues[2]], comments={3: self.comments[:2]}), 3
