@@ -66,14 +66,46 @@ either one. A structurally valid body is not necessarily implementation-ready.
   tradeoffs, recommendation, uncertainty, and a reply example.
 - Preserve resolved decisions, rationale, and provenance. Do not erase meaningful planning history.
 
-### One Pull-Request Outcome
+### One Pull-Request Outcome And Decomposition
 
+- Reassess one-PR scope before detailed refinement and after every material goal, requirement,
+  design, verification, or rollout change.
 - Require one result that can be implemented, verified, reviewed, and delivered coherently in one
-  pull request.
-- Recommend a split only for independently implementable, verifiable, deployable, or reviewable
-  outcomes. File count and elapsed-time estimates are not split criteria.
-- Keep changes together when separate delivery would break compatibility, migration safety,
-  rollback, or atomic verification. Obtain approval before creating more than one issue.
+  pull request. Keep schema and consumer changes, migrations and compatibility code, or other work
+  together when separate delivery would break safety, rollback, or atomic verification.
+- Recommend a split only when every leaf is independently implementable and verifiable. Use an
+  independent deployment or review boundary as additional evidence for the split, never as a reason
+  to separate work that would become unsafe or unverifiable. File count and elapsed-time estimates
+  are not split criteria.
+- Before any multi-issue write, show each proposed leaf with all of these fields:
+  - `Title`: concise issue title.
+  - `Outcome`: independently observable result.
+  - `Scope` and `Out of Scope`: explicit delivery boundary.
+  - `Completion Conditions` and `Verification`: what must hold and how it will be proven.
+  - `Predecessors` and `Blockers`: required earlier outcomes and external impediments; use `none`
+    explicitly when absent.
+  - `Parallelizable With`: leaves that can safely proceed concurrently, or `none`.
+  - `Delivery Order` and `Rollout Effect`: merge/deployment position and user or system effect.
+- Draw predecessor edges from earlier to later leaves and assign dependency waves by repeatedly
+  selecting leaves whose predecessors are all in earlier waves. Leaves in one wave may proceed in
+  parallel only when they have no dependency edge or unsafe shared implementation or verification
+  boundary. A delivery-only migration, compatibility, or rollout sequence does not separate the
+  implementation wave; record it under `Delivery Order` instead.
+- Use a predecessor edge only when the successor cannot be implemented or verified before the
+  earlier outcome exists. Record a merge- or deployment-only constraint under `Delivery Order`
+  instead; add an edge only when that constraint also blocks implementation or verification.
+- Show the wave sequence in compact notation such as `A -> (B || C) -> D` and explain any merge or
+  deployment order that differs from implementation order. Dependency order does not imply product
+  priority.
+- Reject the proposal before publication when a leaf depends on itself, a cycle exists, a claimed
+  parallel pair has a dependency edge, a predecessor appears in a later wave, or scope boundaries
+  contradict completion or rollout conditions. Name the conflicting leaves and the edge or boundary
+  that must change.
+- Show the exact initial issue payloads, complete dependency graph, and planned follow-up link fields,
+  then obtain explicit approval for the complete creation set. A partial approval authorizes no
+  write until the approved subset is replanned as a predecessor-complete DAG and previewed again.
+  After GitHub assigns numbers, show and separately approve the exact dependency-link body patches.
+  Neither approval authorizes edits to pre-existing or otherwise related issues.
 
 ## Readiness Conclusion
 
