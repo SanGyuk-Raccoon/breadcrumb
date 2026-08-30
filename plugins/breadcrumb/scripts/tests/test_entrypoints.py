@@ -71,8 +71,11 @@ class ProjectionEntrypointTests(unittest.TestCase):
         )
 
     def test_inspect_emits_only_one_issue_projection(self) -> None:
+        context = mock.Mock(default_branch="trunk")
         with mock.patch.object(
-            inspect_work_issue, "resolve_repository", return_value=(None, object())
+            inspect_work_issue,
+            "resolve_repository",
+            return_value=(context, object()),
         ), mock.patch.object(
             inspect_work_issue,
             "inspect_issue",
@@ -83,12 +86,20 @@ class ProjectionEntrypointTests(unittest.TestCase):
             )
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["issue"]["number"], 18)
-        inspected.assert_called_once_with(mock.ANY, 18, comment_mode="incremental")
+        inspected.assert_called_once_with(
+            mock.ANY,
+            18,
+            default_branch="trunk",
+            comment_mode="incremental",
+        )
 
     def test_inspect_accepts_both_comment_modes(self) -> None:
         for mode in ("incremental", "all"):
+            context = mock.Mock(default_branch="trunk")
             with self.subTest(mode=mode), mock.patch.object(
-                inspect_work_issue, "resolve_repository", return_value=(None, object())
+                inspect_work_issue,
+                "resolve_repository",
+                return_value=(context, object()),
             ), mock.patch.object(
                 inspect_work_issue,
                 "inspect_issue",
@@ -98,7 +109,12 @@ class ProjectionEntrypointTests(unittest.TestCase):
                     inspect_work_issue, ["18", "--comments", mode]
                 )
             self.assertEqual(exit_code, 0)
-            inspected.assert_called_once_with(mock.ANY, 18, comment_mode=mode)
+            inspected.assert_called_once_with(
+                mock.ANY,
+                18,
+                default_branch="trunk",
+                comment_mode=mode,
+            )
 
     def test_adr_projection_is_local_and_accepts_a_base_ref(self) -> None:
         root = Path("/tmp/repository")
