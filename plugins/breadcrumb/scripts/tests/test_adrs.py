@@ -10,6 +10,7 @@ from support import SCRIPT_ROOT  # noqa: F401
 
 from internal.adrs import parse_adr_bytes, parse_finder_input_json, project_adr_corpus
 from internal.errors import BreadcrumbOperationalError, CliUsageError
+from internal.rendering import render_adr
 
 
 def adr_text(
@@ -281,6 +282,80 @@ class AdrBaseDiffTests(unittest.TestCase):
             capture_output=True,
             text=True,
         ).stdout.strip()
+
+    def test_rendered_arrays_preserve_meaning_through_parser_and_finder(self) -> None:
+        temporary, root = self._repository()
+        self.addCleanup(temporary.cleanup)
+        (root / "README.md").write_text("base", encoding="utf-8")
+        base = self._commit(root)
+        rendered = render_adr(
+            {
+                "issue_number": 20,
+                "slug": "array-round-trip",
+                "title": "Preserve ADR arrays",
+                "status": "accepted",
+                "supersedes": [],
+                "superseded_by": [],
+                "summary": "Preserve renderer input meaning.",
+                "context": "Schema 1 stores arrays as comma-separated values.",
+                "affected_areas": {
+                    "components": ["api", "worker"],
+                    "paths": ["src/api/**", "src/worker/**"],
+                    "resources": ["None", "queue"],
+                    "behaviors": ["request routing", "job dispatch"],
+                },
+                "decision": "Reject values that collide with schema delimiters.",
+                "consequences": "Normal values retain their meaning.",
+                "review_triggers": "Schema 1 gains escaping.",
+            }
+        )
+        write_adr(root, Path(rendered["path"]).name, rendered["body"])
+        digest = project(root)["adr_corpus"]["digest"]
+        finder_input = parse_finder_input_json(
+            json.dumps(
+                {
+                    "work_issue": {
+                        "number": 21,
+                        "title": "Find the rendered ADR",
+                        "url": "https://github.example.test/acme/widgets/issues/21",
+                    },
+                    "goal": "Find a matching rendered ADR.",
+                    "planning_summary": "Match normal affected-area array values.",
+                    "proposed_decisions": [],
+                    "planned_change_scope": {
+                        "components": ["worker"],
+                        "paths": ["src/api/client.py"],
+                        "resources": ["None"],
+                        "behaviors": ["job dispatch"],
+                    },
+                    "base_commit": base,
+                    "corpus_digest": digest,
+                }
+            )
+        )
+        result = project_adr_corpus(
+            root,
+            repository="acme/widgets",
+            hostname="github.example.test",
+            base_ref=base,
+            finder_input=finder_input,
+        )
+
+        self.assertTrue(result["valid"], result)
+        candidate = result["finder"]["candidates"][0]
+        self.assertEqual(candidate["affected_areas"]["components"], "api, worker")
+        self.assertEqual(candidate["affected_areas"]["resources"], "None, queue")
+        self.assertEqual(
+            candidate["deterministic_matches"],
+            {
+                "work_issue": False,
+                "paths": ["src/api/client.py"],
+                "components": ["worker"],
+                "resources": ["None"],
+                "behaviors": ["job dispatch"],
+                "relationships": [],
+            },
+        )
 
     def test_base_diff_accepts_new_adrs_and_rejects_deletion(self) -> None:
         temporary, root = self._repository()
