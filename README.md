@@ -81,7 +81,7 @@ repository permissions.
 
 ## Script Boundaries
 
-Public projection scripts are read-only and each provides one operation:
+Public read-only scripts each provide one operation:
 
 ```bash
 python3.12 plugins/breadcrumb/scripts/list_work_issues.py \
@@ -98,11 +98,17 @@ python3.12 plugins/breadcrumb/scripts/project_adrs.py --compact
 python3.12 plugins/breadcrumb/scripts/project_adrs.py --compact --base origin/main
 python3.12 plugins/breadcrumb/scripts/project_adrs.py \
   --base <commit> --finder-input-json '<compact-json>'
+
+python3.12 plugins/breadcrumb/scripts/validate_planning_evals.py
+python3.12 plugins/breadcrumb/scripts/validate_planning_evals.py \
+  --result /tmp/breadcrumb-evals/public-result.json
 ```
 
 The former operation-dispatching `breadcrumb.py` entrypoint is intentionally removed. Common GitHub
 transport, parsing, projection, error handling, and ADR validation remain shared under
-`scripts/internal/`.
+`scripts/internal/`. The planning-evaluation validator is also local and side-effect free: it reads
+regular non-symlink JSON inputs, performs no GitHub or model call, and reports structural validity
+separately from declared behavioral pass or failure.
 
 Pure artifact renderers accept one structured JSON object on stdin, emit one validated JSON object,
 and perform no external or repository write:
@@ -225,6 +231,21 @@ head/base tuple and ADR diff, reuses a matching open/merged PR, or creates one b
 `Closes #<issue-number>`. Passed verification defaults to a normal PR; failed/pending requires a
 normal-versus-draft choice.
 
+## Planning Behavioral Evaluations
+
+`plugins/breadcrumb/evals/scenarios.json` maps the public issue-planning rules introduced by work
+issues #37 through #40 to version-controlled open/update scenarios. Fixtures contain synthetic
+prompts and durable state, allowed writes, required outcomes, forbidden behavior, and public
+evidence assertions. They contain no credentials, private comments, hidden model traces, or live
+repository mutations.
+
+Static catalog/result validation is deterministic, but it does not prove planning prose quality.
+The documented clean replay withholds expectations from the evaluator, defaults to no live writes,
+captures only public outcomes outside the working tree, and leaves residual semantic judgment to a
+reviewer. See `plugins/breadcrumb/evals/README.md` for the result contract and replay protocol. Any
+PR changing issue-open or issue-update behavior updates deterministic tests and at least one
+applicable rule or scenario in the same PR.
+
 ## Installation
 
 ```bash
@@ -259,6 +280,12 @@ metadata is valid and GitHub author association is `OWNER`, `MEMBER`, or `COLLAB
 comments never grant write permission.
 
 ## Development Verification
+
+Validate the planning scenario catalog:
+
+```bash
+python3.12 plugins/breadcrumb/scripts/validate_planning_evals.py
+```
 
 Run the standard-library suite:
 

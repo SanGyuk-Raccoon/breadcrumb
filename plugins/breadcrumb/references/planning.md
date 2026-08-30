@@ -155,6 +155,19 @@ when applicable. Put the concise record in the issue narrative or update checkpo
 control metadata or copying raw comments. Preserve the existing contiguous comment prefix, single
 body PATCH, concurrency revalidation, and partial-result boundaries.
 
+## Behavioral Regression Coverage
+
+When a pull request changes issue-open or issue-update planning behavior, update deterministic tests
+and at least one applicable rule or scenario in `plugins/breadcrumb/evals/scenarios.json` in the same
+pull request. Validate the complete catalog with `validate_planning_evals.py` and replay affected
+scenarios through `plugins/breadcrumb/evals/README.md` when the change relies on semantic agent
+judgment.
+
+Keep deterministic guarantees, host-assisted replay evidence, and residual reviewer judgment
+separate. Scenario expectations cover public outputs and action boundaries only; they do not make
+generated wording canonical, expose hidden reasoning, authorize live writes, or replace the shared
+planning and ADR gates.
+
 ## Readiness Conclusion
 
 - `backlog`: durable capture only; planning has not started.

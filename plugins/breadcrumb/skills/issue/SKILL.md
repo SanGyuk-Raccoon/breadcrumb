@@ -12,6 +12,21 @@ Read [common.md](../../references/common.md), [planning.md](../../references/pla
 [issue.md](../../references/issue.md), and [artifacts.md](../../references/artifacts.md). Read
 [adr.md](../../references/adr.md) before publishing a `complete` plan or materially reopening one.
 
+Apply these transaction guardrails before proposing any mutation:
+
+- When no existing issue is selected, a request to create or open one remains an `open` operation.
+  If the requested `complete` payload fails readiness, propose an `in-progress` open payload; never
+  reclassify it as `update` merely to repair the plan.
+- For mutually exclusive ordinary comments without public evidence accepting or rejecting one,
+  stop before the earliest conflict. Listing both requests as unresolved options does not reflect
+  either comment and authorizes no body PATCH or update checkpoint.
+- Treat any predecessor, blocker, parallelization, delivery-order, or rollout input change as a
+  dependency replan. Recompute the complete DAG, waves, delivery order, and rollout effect, and do
+  not write a related issue without its separate selected-issue update authorization.
+- For a confirmed stale transition, expose and perform the body/comment-prefix snapshot check both
+  before the first mutation and again after draft conversion but before the body PATCH. Preserve
+  and report the verified draft conversion if the second boundary fails.
+
 Use `inspect_work_issue.py` for current issue and comment state, `project_adrs.py` for the planning
 gate, `render_work_issue.py` for a complete issue payload, and `render_update_comment.py` for its
 checkpoint. For a coordinated implemented `complete -> in-progress` transition, use
