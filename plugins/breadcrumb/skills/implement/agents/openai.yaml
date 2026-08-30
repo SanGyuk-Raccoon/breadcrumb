@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement"
+  short_description: "Implement, verify, push, and record a complete work issue"
+  default_prompt: "Use $implement to implement and verify the selected Breadcrumb work issue."

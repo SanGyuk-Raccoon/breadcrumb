@@ -9,7 +9,7 @@ from internal.documents import HEADINGS, parse_work_body
 
 
 REPORT_SCRIPT = (
-    SCRIPT_ROOT.parent / "skills" / "breadcrumb-report" / "scripts" / "render_report.py"
+    SCRIPT_ROOT.parent / "skills" / "report" / "scripts" / "render_report.py"
 )
 SPEC = importlib.util.spec_from_file_location("breadcrumb_report_renderer", REPORT_SCRIPT)
 assert SPEC is not None and SPEC.loader is not None

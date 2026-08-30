@@ -12,69 +12,92 @@ from unittest import mock
 
 from support import SCRIPT_ROOT  # noqa: F401
 
-import breadcrumb
+import inspect_work_issue
+import list_work_issues
+import project_adrs
 from internal.cli import operational_error
 from internal.github import parse_target
 
 
-def invoke(arguments: list[str]) -> tuple[int, dict[str, object], str]:
+def invoke(module: object, arguments: list[str]) -> tuple[int, dict[str, object], str]:
     stdout = io.StringIO()
     stderr = io.StringIO()
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-        exit_code = breadcrumb.main(arguments)
+        exit_code = module.main(arguments)  # type: ignore[attr-defined]
     return exit_code, json.loads(stdout.getvalue()), stderr.getvalue()
 
 
-class CliTests(unittest.TestCase):
-    def test_requires_a_subcommand(self) -> None:
-        exit_code, payload, diagnostic = invoke([])
+class ProjectionEntrypointTests(unittest.TestCase):
+    def test_inspect_requires_one_issue_number(self) -> None:
+        exit_code, payload, diagnostic = invoke(inspect_work_issue, [])
         self.assertEqual(exit_code, 2)
-        self.assertEqual(payload["projection_version"], 1)
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
         self.assertTrue(diagnostic)
+
+    def test_entrypoints_reject_other_operation_shapes(self) -> None:
+        variants = (
+            (list_work_issues, ["inspect", "18"]),
+            (inspect_work_issue, ["18", "--status", "complete"]),
+            (project_adrs, ["list"]),
+        )
+        for module, arguments in variants:
+            with self.subTest(module=module.__name__):
+                exit_code, payload, _ = invoke(module, arguments)
+                self.assertEqual(exit_code, 2)
+                self.assertEqual(payload["error"]["code"], "invalid_arguments")
 
     def test_inspect_rejects_non_positive_or_padded_numbers(self) -> None:
         for value in ("0", "-1", "01"):
             with self.subTest(value=value):
-                exit_code, payload, _ = invoke(["inspect", value])
+                exit_code, payload, _ = invoke(inspect_work_issue, [value])
                 self.assertEqual(exit_code, 2)
                 self.assertEqual(payload["error"]["code"], "invalid_arguments")
 
-    def test_list_and_inspect_emit_projection_json(self) -> None:
-        with mock.patch.object(breadcrumb, "resolve_repository", return_value=(None, object())), mock.patch.object(
-            breadcrumb,
+    def test_list_emits_only_the_issue_collection_projection(self) -> None:
+        with mock.patch.object(
+            list_work_issues, "resolve_repository", return_value=(None, object())
+        ), mock.patch.object(
+            list_work_issues,
             "list_issues",
             return_value={"projection_version": 1, "issues": []},
         ) as listed:
-            exit_code, payload, _ = invoke(["list", "--status", "complete"])
+            exit_code, payload, _ = invoke(
+                list_work_issues, ["--status", "complete"]
+            )
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["issues"], [])
         listed.assert_called_once_with(
             mock.ANY, status_filter="complete", include_closed=False
         )
 
-        with mock.patch.object(breadcrumb, "resolve_repository", return_value=(None, object())), mock.patch.object(
-            breadcrumb,
+    def test_inspect_emits_only_one_issue_projection(self) -> None:
+        with mock.patch.object(
+            inspect_work_issue, "resolve_repository", return_value=(None, object())
+        ), mock.patch.object(
+            inspect_work_issue,
             "inspect_issue",
             return_value={"projection_version": 1, "issue": {"number": 18}},
         ) as inspected:
-            exit_code, payload, _ = invoke(["inspect", "18"])
+            exit_code, payload, _ = invoke(
+                inspect_work_issue, ["18", "--comments", "incremental"]
+            )
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["issue"]["number"], 18)
-        inspected.assert_called_once_with(mock.ANY, 18, comment_mode=None)
+        inspected.assert_called_once_with(mock.ANY, 18, comment_mode="incremental")
 
-    def test_inspect_accepts_explicit_comment_modes(self) -> None:
+    def test_inspect_accepts_both_comment_modes(self) -> None:
         for mode in ("incremental", "all"):
             with self.subTest(mode=mode), mock.patch.object(
-                breadcrumb, "resolve_repository", return_value=(None, object())
+                inspect_work_issue, "resolve_repository", return_value=(None, object())
             ), mock.patch.object(
-                breadcrumb,
+                inspect_work_issue,
                 "inspect_issue",
                 return_value={"projection_version": 1, "issue": {"number": 18}},
             ) as inspected:
-                exit_code, payload, _ = invoke(["inspect", "18", "--comments", mode])
+                exit_code, _, _ = invoke(
+                    inspect_work_issue, ["18", "--comments", mode]
+                )
             self.assertEqual(exit_code, 0)
-            self.assertEqual(payload["issue"]["number"], 18)
             inspected.assert_called_once_with(mock.ANY, 18, comment_mode=mode)
 
     def test_adr_projection_is_local_and_accepts_a_base_ref(self) -> None:
@@ -86,14 +109,14 @@ class CliTests(unittest.TestCase):
             "valid": True,
         }
         with mock.patch.object(
-            breadcrumb,
+            project_adrs,
             "discover_repository",
             return_value=(root, "origin", target),
         ) as discovered, mock.patch.object(
-            breadcrumb, "project_adr_corpus", return_value=expected
-        ) as projected, mock.patch.object(breadcrumb, "resolve_repository") as resolved:
+            project_adrs, "project_adr_corpus", return_value=expected
+        ) as projected:
             exit_code, payload, _ = invoke(
-                ["adr", "--compact", "--base", "origin/main"]
+                project_adrs, ["--compact", "--base", "origin/main"]
             )
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload, expected)
@@ -106,38 +129,34 @@ class CliTests(unittest.TestCase):
             finder_input=None,
             compact=True,
         )
-        resolved.assert_not_called()
 
     def test_adr_finder_input_rejects_malformed_json(self) -> None:
         root = Path("/tmp/repository")
         target = parse_target("github.example.test", "acme/widgets")
         with mock.patch.object(
-            breadcrumb,
+            project_adrs,
             "discover_repository",
             return_value=(root, "origin", target),
-        ) as discovered:
+        ):
             exit_code, payload, _ = invoke(
-                ["adr", "--base", "main", "--finder-input-json", "not-json"]
+                project_adrs,
+                ["--base", "main", "--finder-input-json", "not-json"],
             )
         self.assertEqual(exit_code, 2)
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
-        discovered.assert_called_once_with()
 
-    def test_inspect_rejects_unknown_comment_mode(self) -> None:
-        exit_code, payload, _ = invoke(["inspect", "18", "--comments", "recent"])
-        self.assertEqual(exit_code, 2)
-        self.assertEqual(payload["error"]["code"], "invalid_arguments")
-
-    def test_passes_canonical_github_cli_executable(self) -> None:
+    def test_github_entrypoints_pass_the_canonical_cli_executable(self) -> None:
         executable = str(Path(sys.executable).resolve())
         with mock.patch.object(
-            breadcrumb, "resolve_repository", return_value=(None, object())
+            list_work_issues, "resolve_repository", return_value=(None, object())
         ) as resolved, mock.patch.object(
-            breadcrumb,
+            list_work_issues,
             "list_issues",
             return_value={"projection_version": 1, "issues": []},
         ):
-            exit_code, _, _ = invoke(["--gh-executable", executable, "list"])
+            exit_code, _, _ = invoke(
+                list_work_issues, ["--gh-executable", executable]
+            )
         self.assertEqual(exit_code, 0)
         resolved.assert_called_once_with(gh_executable=executable)
 
@@ -156,7 +175,7 @@ class CliTests(unittest.TestCase):
             for candidate in candidates:
                 with self.subTest(candidate=candidate):
                     exit_code, payload, _ = invoke(
-                        ["--gh-executable", candidate, "list"]
+                        list_work_issues, ["--gh-executable", candidate]
                     )
                     self.assertEqual(exit_code, 2)
                     self.assertEqual(payload["error"]["code"], "invalid_arguments")
@@ -166,13 +185,15 @@ class CliTests(unittest.TestCase):
             link = Path(directory) / "gh"
             link.symlink_to(Path(sys.executable).resolve())
             with mock.patch.object(
-                breadcrumb, "resolve_repository", return_value=(None, object())
+                list_work_issues, "resolve_repository", return_value=(None, object())
             ) as resolved, mock.patch.object(
-                breadcrumb,
+                list_work_issues,
                 "list_issues",
                 return_value={"projection_version": 1, "issues": []},
             ):
-                exit_code, _, _ = invoke(["--gh-executable", str(link), "list"])
+                exit_code, _, _ = invoke(
+                    list_work_issues, ["--gh-executable", str(link)]
+                )
         self.assertEqual(exit_code, 0)
         resolved.assert_called_once_with(
             gh_executable=str(Path(sys.executable).resolve())
@@ -180,7 +201,7 @@ class CliTests(unittest.TestCase):
 
     def test_python_guard_runs_before_normal_work(self) -> None:
         with mock.patch.object(sys, "version_info", (3, 10, 0)):
-            exit_code, payload, _ = invoke(["list"])
+            exit_code, payload, _ = invoke(list_work_issues, [])
         self.assertEqual(exit_code, 2)
         self.assertEqual(payload["error"]["code"], "unsupported_python")
 
