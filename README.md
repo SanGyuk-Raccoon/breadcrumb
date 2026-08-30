@@ -50,6 +50,12 @@ explicit without adding control metadata or treating dependency order as priorit
 creation set and, after GitHub assigns issue numbers, the exact dependency-link patches require
 separate previewed approvals; pre-existing related issues are never edited implicitly.
 
+Every issue update compares the exact current and proposed bodies and transitively reassesses the
+planning sections affected by each semantic change. It classifies the result as a non-material
+clarification, material replan, dependency replan, or implementation-stale change; material changes
+repeat the applicable planning and ADR gates, while stale candidates retain the confirmed PR-draft
+boundary. The conclusion is recorded without new control metadata or implicit related-issue writes.
+
 ## Skills
 
 The plugin exposes seven focused skills. `breadcrumb` is the plugin namespace, so the skill names do

@@ -21,6 +21,9 @@ When one request needs multiple PR-sized issues, keep it as one planning operati
 leaf proposal, dependency-wave validation, and approved multi-issue creation transaction in the
 loaded references.
 
+For an update, compare the exact current body with one proposed final body and apply the complete
+transitive change-impact matrix before deciding that planning or an implementation remains current.
+
 An ordinary transaction may create or patch only the selected issue and post its update comments.
 The approved multi-issue creation transaction may additionally create and link only its exact
 previewed leaf set, then keeps one issue selected. The skill's only PR mutation is converting the
