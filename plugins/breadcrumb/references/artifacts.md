@@ -19,16 +19,46 @@ Use `scripts/render_work_issue.py`. The body has exactly these visible level-two
 ```
 
 The first five sections may contain human-readable Markdown with level-three or deeper subsections.
-`Todo` contains only Markdown task-list items and blank lines. New or rewritten items use durable
-`T<number>:` identifiers with a positive integer and no leading zero; never reuse an identifier or
-change a completed item's meaning. Preserve meaningful completed work and mark cancellation as a
-checked item with a concise reason. Existing items without a canonical ID remain valid and surface
-a non-blocking warning instead of requiring bulk migration.
+When Status is `complete`, each must contain non-whitespace content and must not consist solely of
+one case-insensitive reserved placeholder: `<background>`, `<goal>`, `<requirements>`, `<design>`,
+`<verification>`, `TBD`, `TODO`, `unknown`, `pending`, `none`, or `N/A`. The check is exact; prose
+such as "the cause is unknown until runtime evidence is captured" remains ordinary content.
 
-A decision-bearing unresolved Todo has a same-ID Decision Brief under the relevant narrative
-section. Include Why, real Options with benefits/costs/risks/prerequisites, an evidence-based
-Recommendation and uncertainty, and a reply example. After resolution, preserve the comparison and
-add the final Decision, rationale, and source comment URL before checking the item.
+`Todo` contains only Markdown task-list items and blank lines. New or rewritten items use one of
+these visible forms:
+
+```text
+- [ ] T1: Decision: <decision that needs an answer>
+- [ ] T2: Action: <procedural planning action>
+```
+
+IDs use a positive integer with no leading zero. Never reuse an identifier or change a completed
+item's meaning. Preserve meaningful completed work and mark cancellation as a checked Action with a
+concise reason. Existing items without a canonical ID produce `missing_todo_id`; canonical but
+untyped items produce `missing_todo_kind`. Both remain valid and projectable instead of requiring
+bulk migration.
+
+Every explicitly typed unresolved Decision has exactly one same-ID Decision Brief under Background,
+Goal, Requirements, Design, or Verification. Use this visible structure; each listed field appears
+once with a non-empty value:
+
+```markdown
+#### T1 — <title>
+
+- Why: <reason this decision matters>
+- Options: <available options>
+- Recommendation: <evidence-based recommendation>
+- Uncertainty: <remaining uncertainty>
+- Reply example: `T1: <answer>`
+```
+
+Deterministic validation checks only presence, uniqueness, and field shape. The shared planning gate
+judges whether options cover real benefits, costs, risks, and prerequisites and whether the
+recommendation is supportable. A missing brief produces `missing_decision_brief`; a duplicate ID
+produces `duplicate_decision_brief`; missing, repeated, or empty fields produce
+`invalid_decision_brief`. Historical untyped or completed Todo is not forced through the new brief
+check. After resolution, preserve the comparison and add the final Decision, rationale, and source
+comment URL before checking the item.
 
 End the body with exactly:
 
@@ -88,8 +118,10 @@ It returns the validated repository-relative `path` and `body` but never writes 
 and issue projections. Their shared compact issue fields are number, title, URL, GitHub state,
 schema version, Status, Todo counts and items, document warnings, implementation or `null`, pull
 request or `null`, validity, and structured errors. Each Todo item has `id` (`T<number>` or `null`),
-`checked`, `text`, and a one-based source `line`. A missing ID produces a `missing_todo_id` warning;
-a duplicate non-null ID produces a `duplicate_todo_id` error. Status-filtered lists still surface
+`checked`, `text`, and a one-based source `line`; the visible `Decision:` or `Action:` prefix remains
+part of `text`, so Schema Version and projection shape stay unchanged. Missing ID/kind warnings and
+duplicate Todo or Decision Brief errors use the codes defined above. Complete-section failures use
+`empty_required_section` or `placeholder_required_section`. Status-filtered lists still surface
 invalid items.
 
 Inspect additionally returns the current `default_branch`. Its detailed issue projection includes

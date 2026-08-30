@@ -12,8 +12,9 @@ either one. A structurally valid body is not necessarily implementation-ready.
 2. Draft Background, Goal, Requirements, Design, Verification, and Todo from that evidence. Do not
    restate a requested solution as proof of the current problem or invent repository behavior.
 3. Run the quality checks below. When one answer materially changes scope or acceptance, ask one
-   focused highest-impact question. Otherwise turn the uncertainty into a concrete unchecked Todo
-   with a stable identifier and the required Decision Brief.
+   focused highest-impact question. Otherwise turn the uncertainty into a concrete unchecked
+   `T<number>: Decision:` Todo with the required Decision Brief. Use `T<number>: Action:` for a
+   procedural planning step whose execution, rather than its answer, closes the item.
 4. Re-run the gate after every material answer, comment conclusion, scope change, or design change.
    Keep the issue `in-progress` until every blocking finding is resolved and recorded durably.
 
@@ -59,6 +60,8 @@ either one. A structurally valid body is not necessarily implementation-ready.
 
 - Put every unresolved decision that can change scope, acceptance, design, verification, or ADR
   disposition in Todo; do not hide it in narrative prose.
+- Give every new or rewritten Todo the explicit `Decision:` or `Action:` kind after its stable ID.
+  Preserve legacy and completed wording unless its meaning genuinely changes.
 - Give every decision-bearing unresolved Todo a same-ID Decision Brief with real options,
   tradeoffs, recommendation, uncertainty, and a reply example.
 - Preserve resolved decisions, rationale, and provenance. Do not erase meaningful planning history.

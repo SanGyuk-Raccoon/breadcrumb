@@ -30,9 +30,10 @@ backlog -> in-progress -> complete
 - A merged closing PR completes delivery and closes the issue. Body Status remains `complete`.
 
 Meaningful completed Todo remains checked as durable decision history. New or rewritten Todo uses a
-stable `T<number>:` identifier. Decision-bearing Todo has a matching Decision Brief with real
-options, tradeoffs, recommendation, uncertainty, and a reply example. Requirement/design changes
-after an implementation mark it stale and return the issue to `in-progress`.
+stable `T<number>: Decision:` or `T<number>: Action:` prefix. Every unresolved Decision has a
+matching Decision Brief with Why, Options, Recommendation, Uncertainty, and Reply example fields.
+Requirement/design changes after an implementation mark it stale and return the issue to
+`in-progress`.
 
 Issue open, issue update, and read-only planning review use one shared planning quality gate. Before
 `complete`, the plan must establish the current problem from evidence, define an observable goal and
@@ -118,10 +119,15 @@ Every work issue uses exactly the `breadcrumb` label and these fixed visible hea
 ## Breadcrumb Status
 ```
 
-Final Status metadata, Todo checkboxes, and canonical `T[1-9][0-9]*:` Todo identifiers are
-machine parsed. Projections preserve the existing resolved/unresolved counts and add each item's ID,
-checked state, text, and source line. Existing items without an ID remain valid and produce a
-non-blocking warning instead of requiring bulk migration:
+Final Status metadata, Todo checkboxes, canonical `T[1-9][0-9]*:` Todo identifiers, and explicit
+`Decision:`/`Action:` kinds are machine parsed. Projections preserve the existing
+resolved/unresolved counts and each item's ID, checked state, text, and source line; the visible kind
+stays in `text`, so the projection shape remains unchanged. Existing items without an ID or kind
+remain valid with non-blocking warnings instead of requiring bulk migration. For `complete`, each
+core narrative section must be non-empty and not consist only of a reserved placeholder. An
+explicitly typed unresolved Decision must have exactly one structurally complete same-ID brief.
+Whether prose is sufficient, tradeoffs are real, verification proves requirements, and the work is
+one cohesive PR remains a semantic planning-gate judgment:
 
 ```markdown
 ## Breadcrumb Status
