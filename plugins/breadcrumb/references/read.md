@@ -35,14 +35,9 @@ or infer write approval from issue state.
 
 Choose planning or implementation review from explicit intent; ask only when genuinely ambiguous.
 
-For planning, review Background through Verification for:
-
-- clear scope and observable goal;
-- complete, non-conflicting requirements;
-- technically sufficient design and recovery boundaries;
-- verification that proves each behavior;
-- no unresolved decision hidden outside Todo;
-- one coherent PR outcome.
+For planning, apply every check in the shared planning quality gate to Background through
+Verification and report each failure against the relevant issue section. Do not substitute body
+length, heading presence, or an empty Todo list for semantic readiness.
 
 Require valid ADR projection, complete finder coverage bound to the Planning Base and corpus digest,
 one justified disposition, and complete drafts/lifecycle edits when needed.

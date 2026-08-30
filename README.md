@@ -34,6 +34,13 @@ stable `T<number>:` identifier. Decision-bearing Todo has a matching Decision Br
 options, tradeoffs, recommendation, uncertainty, and a reply example. Requirement/design changes
 after an implementation mark it stale and return the issue to `in-progress`.
 
+Issue open, issue update, and read-only planning review use one shared planning quality gate. Before
+`complete`, the plan must establish the current problem from evidence, define an observable goal and
+material exclusions, cover normal and relevant failure or compatibility requirements, provide a
+technically sufficient design with recovery boundaries, map observable requirements to verification,
+expose every unresolved decision in Todo, and produce one cohesive pull-request outcome. Fixed
+headings and an empty Todo list alone never prove implementation readiness.
+
 ## Skills
 
 The plugin exposes seven focused skills. `breadcrumb` is the plugin namespace, so the skill names do
