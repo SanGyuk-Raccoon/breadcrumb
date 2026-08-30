@@ -42,6 +42,14 @@ technically sufficient design with recovery boundaries, map observable requireme
 expose every unresolved decision in Todo, and produce one cohesive pull-request outcome. Fixed
 headings and an empty Todo list alone never prove implementation readiness.
 
+When a requested outcome cannot safely fit one PR, issue planning proposes independently
+implementable and verifiable leaf issues before creating them. Each proposal includes boundaries,
+completion and verification, predecessors and blockers, safe parallel work, delivery order, and
+rollout effect. An acyclic wave sequence such as `A -> (B || C) -> D` makes implementation order
+explicit without adding control metadata or treating dependency order as priority. The complete
+creation set and, after GitHub assigns issue numbers, the exact dependency-link patches require
+separate previewed approvals; pre-existing related issues are never edited implicitly.
+
 ## Skills
 
 The plugin exposes seven focused skills. `breadcrumb` is the plugin namespace, so the skill names do

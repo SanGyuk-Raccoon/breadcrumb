@@ -13,10 +13,12 @@ material requirements, decisions, progress, and planning state belong in the iss
 3. Add a same-ID Decision Brief for every decision-bearing unresolved Todo using the contract in
    `artifacts.md`. Do not invent alternatives; state when only one option is viable or evidence does
    not support a recommendation.
-4. Evaluate one-PR scope before detailed refinement and after every scope-changing answer. Split
-   only for independently implementable, verifiable, deployable, or reviewable outcomes, never by
-   file count or elapsed-time estimate. Show proposed leaf issues and ask before creating more than
-   one.
+4. Evaluate one-PR scope before detailed refinement and after every material scope-changing answer.
+   Keep coupled migration, compatibility, rollout, and atomic-verification work together. When a
+   split is warranted, apply the leaf-proposal and dependency-wave contract in `planning.md`: show
+   every boundary and completion condition, reject cycles or contradictions, distinguish
+   implementation from delivery order, and ask for explicit approval of the complete creation set
+   before creating more than one issue.
 5. Re-run the shared gate after refinement. Choose Status from the recorded evidence: a capture is
    `backlog`; active refinement with unresolved Todo is `in-progress`; `complete` requires every
    quality check, zero unresolved Todo, one cohesive PR outcome, and the ADR planning gate.
@@ -32,6 +34,33 @@ material requirements, decisions, progress, and planning state belong in the iss
 For a new plan that cannot complete its ADR gate until a real issue number exists, create one
 `in-progress` issue with a concrete planning-gate Todo, then complete it through `update` after the
 digest-bound finder succeeds.
+
+## Approved Multi-Issue Creation
+
+Treat decomposition as a series of individually verified writes, not a cross-issue transaction:
+
+1. Before mutation, show the exact initial rendered payload for every leaf, the acyclic wave
+   sequence, and the narrative fields that will later receive durable GitHub issue links. A leaf
+   whose ADR gate requires its assigned number remains `in-progress` in this initial payload. Obtain
+   explicit approval for the complete creation set. A partial approval authorizes no write until the
+   requested subset is replanned as a predecessor-complete DAG and previewed again.
+2. Immediately revalidate all payloads and repository permissions. Create leaves in dependency-wave
+   order, using a stable temporary leaf key to correlate returned issue numbers. Verify each strong
+   response before continuing. If a response is ambiguous or a write fails, stop without replaying,
+   deleting, or attempting later-wave writes; report the confirmed partial result.
+3. After every approved leaf has a confirmed number and URL, finish any required per-leaf planning
+   gate and render each exact proposed final body. Under `Design`, use a
+   `### Dependencies and Delivery Order` subsection to link predecessors, successors, and
+   parallelizable peers and record the wave, delivery order, and rollout effect. These links are
+   narrative planning data, never Breadcrumb Status fields. Show every exact body replacement and
+   obtain a separate approval for the complete PATCH set.
+4. Revalidate each newly created leaf's current body immediately before its approved PATCH, apply at
+   most one PATCH per leaf, and verify the exact final body and links. Never patch a pre-existing
+   dependency or related issue in this transaction; propose that work as a separate selected-issue
+   update. If link-patch approval is declined or unavailable, preserve the created issues and report
+   the missing durable links as a partial result.
+5. Report all created and patched issue URLs, the final wave sequence, and any partial failure. Keep
+   only one issue selected for subsequent work and do not begin implementation implicitly.
 
 ## Update
 
@@ -51,8 +80,10 @@ digest-bound finder succeeds.
 4. Re-run the shared planning quality gate against the proposed complete body. Every changed
    requirement or design decision must update affected design, verification, uncertainty, and
    planning evidence; unresolved findings become new Todo rather than hidden prose.
-5. Reassess one-PR scope. Recommend a split when independent outcomes emerged, explain boundaries,
-   and stop before creating another issue without separate `open` approval.
+5. Reassess one-PR scope. When independent outcomes emerged, produce the complete leaf proposal,
+   validate its dependency waves, and stop before any additional creation or newly-created-leaf
+   PATCH unless the user explicitly approves the applicable creation or newly-created-leaf PATCH
+   set under Approved Multi-Issue Creation.
 6. Keep Status/Todo consistent. Before transition to `complete`, apply `adr.md` and persist Planning
    Base, Planned Change Scope, digest-bound complete finder result, final disposition, and complete
    planned ADR drafts or lifecycle edits. Show and confirm a normalized full-body replacement before

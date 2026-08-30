@@ -17,6 +17,12 @@ gate, `render_work_issue.py` for a complete issue payload, and `render_update_co
 checkpoint. For a coordinated implemented `complete -> in-progress` transition, use
 `render_stale_comment.py` after the required confirmation.
 
-This skill may create or patch the selected issue and post its update comments. Its only PR mutation
-is converting the already-linked open PR to draft during the confirmed stale transition. It does
-not write ADR files, modify product code, commit, push, create a PR, or silently start implementation.
+When one request needs multiple PR-sized issues, keep it as one planning operation and follow the
+leaf proposal, dependency-wave validation, and approved multi-issue creation transaction in the
+loaded references.
+
+An ordinary transaction may create or patch only the selected issue and post its update comments.
+The approved multi-issue creation transaction may additionally create and link only its exact
+previewed leaf set, then keeps one issue selected. The skill's only PR mutation is converting the
+already-linked open PR to draft during the confirmed stale transition. It does not write ADR files,
+modify product code, commit, push, create a PR, or silently start implementation.
