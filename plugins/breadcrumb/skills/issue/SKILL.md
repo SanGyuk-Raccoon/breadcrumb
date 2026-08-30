@@ -8,9 +8,9 @@ description: "Create or update a Breadcrumb work issue and its durable planning 
 Own the durable planning transaction for one Breadcrumb work issue. Choose `open` for a new issue
 and `update` for an existing issue.
 
-Read [common.md](../../references/common.md), [issue.md](../../references/issue.md), and
-[artifacts.md](../../references/artifacts.md). Read [adr.md](../../references/adr.md) before
-publishing a `complete` plan or materially reopening one.
+Read [common.md](../../references/common.md), [planning.md](../../references/planning.md),
+[issue.md](../../references/issue.md), and [artifacts.md](../../references/artifacts.md). Read
+[adr.md](../../references/adr.md) before publishing a `complete` plan or materially reopening one.
 
 Use `inspect_work_issue.py` for current issue and comment state, `project_adrs.py` for the planning
 gate, `render_work_issue.py` for a complete issue payload, and `render_update_comment.py` for its

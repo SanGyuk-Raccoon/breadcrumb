@@ -12,9 +12,10 @@ Provide the read-only surface of the Breadcrumb workflow.
 - Use `review` to critique a plan or implementation without persistence.
 - When a Breadcrumb request is ambiguous, load the durable state and present allowed next actions.
 
-Read [common.md](../../references/common.md), [read.md](../../references/read.md), and
-[artifacts.md](../../references/artifacts.md). Read [adr.md](../../references/adr.md) when the
-answer depends on ADR planning, lifecycle, or implementation evidence.
+Read [common.md](../../references/common.md), [planning.md](../../references/planning.md),
+[read.md](../../references/read.md), and [artifacts.md](../../references/artifacts.md). Read
+[adr.md](../../references/adr.md) when the answer depends on ADR planning, lifecycle, or
+implementation evidence.
 
 Use only the operation-specific read-only projections:
 

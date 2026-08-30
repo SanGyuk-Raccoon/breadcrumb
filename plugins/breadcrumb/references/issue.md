@@ -5,24 +5,27 @@ material requirements, decisions, progress, and planning state belong in the iss
 
 ## Open
 
-1. Extract Background, Goal, Requirements, Design, Verification, and Todo. Ask one focused question
-   only when the answer materially changes scope or acceptance. Otherwise record unresolved work as
-   concrete unchecked Todo with increasing stable `T<number>` identifiers.
-2. Add a same-ID Decision Brief for every decision-bearing unresolved Todo using the contract in
+1. Inspect available repository evidence, then extract Background, Goal, Requirements, Design,
+   Verification, and Todo. Distinguish fact, inference, user requirement, and uncertainty.
+2. Apply the shared planning quality gate before detailed refinement. Ask one focused highest-impact
+   question only when its answer materially changes scope or acceptance. Otherwise record the
+   uncertainty as a concrete unchecked Todo with an increasing stable `T<number>` identifier.
+3. Add a same-ID Decision Brief for every decision-bearing unresolved Todo using the contract in
    `artifacts.md`. Do not invent alternatives; state when only one option is viable or evidence does
    not support a recommendation.
-3. Evaluate one-PR scope before detailed refinement and after scope-changing answers. Split only for
-   independently implementable, verifiable, deployable, or reviewable outcomes, never by file count
-   or elapsed-time estimate. Show proposed leaf issues and ask before creating more than one.
-4. Choose Status from actual readiness. A capture is `backlog`; active refinement with unresolved
-   Todo is `in-progress`; an implementation-ready plan with none unresolved is `complete`. Direct
-   `backlog -> complete` is allowed only after the ADR planning gate.
-5. Render with `render_work_issue.py`. When issue creation was explicitly requested, that authorizes
+4. Evaluate one-PR scope before detailed refinement and after every scope-changing answer. Split
+   only for independently implementable, verifiable, deployable, or reviewable outcomes, never by
+   file count or elapsed-time estimate. Show proposed leaf issues and ask before creating more than
+   one.
+5. Re-run the shared gate after refinement. Choose Status from the recorded evidence: a capture is
+   `backlog`; active refinement with unresolved Todo is `in-progress`; `complete` requires every
+   quality check, zero unresolved Todo, one cohesive PR outcome, and the ADR planning gate.
+6. Render with `render_work_issue.py`. When issue creation was explicitly requested, that authorizes
    one ordinary POST. Otherwise show exact title, body, and label and wait.
-6. Immediately before POST, revalidate repository identity, Issues capability, exact `breadcrumb`
+7. Immediately before POST, revalidate repository identity, Issues capability, exact `breadcrumb`
    label, title, and rendered body. Send only structured `title`, `body`, and
    `labels: ["breadcrumb"]` once.
-7. Verify returned positive number, URL, title, body, and exact label. If a strong number is returned
+8. Verify returned positive number, URL, title, body, and exact label. If a strong number is returned
    but the response is incomplete, GET it once. Never replay a create blindly. Select the confirmed
    issue for this conversation but do not start another workflow without authorization.
 
@@ -45,13 +48,17 @@ digest-bound finder succeeds.
    Decision Brief, add final Decision/rationale, then check it. Give new or rewritten Todo stable
    unused IDs and required Decision Briefs. Append newly discovered work instead of pretending the
    original list was final.
-4. Reassess one-PR scope. Recommend a split when independent outcomes emerged, explain boundaries,
+4. Re-run the shared planning quality gate against the proposed complete body. Every changed
+   requirement or design decision must update affected design, verification, uncertainty, and
+   planning evidence; unresolved findings become new Todo rather than hidden prose.
+5. Reassess one-PR scope. Recommend a split when independent outcomes emerged, explain boundaries,
    and stop before creating another issue without separate `open` approval.
-5. Keep Status/Todo consistent. Before transition to `complete`, apply `adr.md` and persist Planning
+6. Keep Status/Todo consistent. Before transition to `complete`, apply `adr.md` and persist Planning
    Base, Planned Change Scope, digest-bound complete finder result, final disposition, and complete
    planned ADR drafts or lifecycle edits. Show and confirm a normalized full-body replacement before
    repairing malformed schema 1; never overwrite a future schema.
-6. Render the full final body with `render_work_issue.py` and PATCH it once after revalidation.
+7. Run the shared gate once more after the ADR result is recorded. Render the full final body with
+   `render_work_issue.py` and PATCH it once after revalidation.
 
 ## Coordinated Stale Transition
 
